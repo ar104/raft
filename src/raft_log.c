@@ -29,10 +29,7 @@ typedef struct
     int count;
 
     /* position of the queue */
-    int front, back;
-
-    /* we compact the log, and thus need to increment the Base Log Index */
-    int base;
+    int front, back; // Absolute idx
 
     raft_entry_t* entries;
 
@@ -41,9 +38,11 @@ typedef struct
     void* raft;
 } log_private_t;
 
+#define REL_POS(_i, _s) ((_i) % (_s))
+
 static void __ensurecapacity(log_private_t * me)
 {
-    int i, j;
+    int i;
     raft_entry_t *temp;
 
     if (me->count < me->size)
@@ -51,11 +50,11 @@ static void __ensurecapacity(log_private_t * me)
 
     temp = (raft_entry_t*)calloc(1, sizeof(raft_entry_t) * me->size * 2);
 
-    for (i = 0, j = me->front; i < me->count; i++, j++)
+    for (i = me->front; i < me->back; i++)
     {
-        if (j == me->size)
-            j = 0;
-        memcpy(&temp[i], &me->entries[j], sizeof(raft_entry_t));
+      memcpy(&temp[REL_POS(i, 2*me->size)], 
+	     &me->entries[REL_POS(i, me->size)], 
+	     sizeof(raft_entry_t));
     }
 
     /* clean up old entries */
@@ -63,8 +62,6 @@ static void __ensurecapacity(log_private_t * me)
 
     me->size *= 2;
     me->entries = temp;
-    me->front = 0;
-    me->back = me->count;
 }
 
 log_t* log_new()
@@ -93,7 +90,6 @@ void log_clear(log_t* me_)
     me->count = 0;
     me->back = 0;
     me->front = 0;
-    me->base = 0;
 }
 
 int log_append_entry(log_t* me_, raft_entry_t* c)
@@ -111,35 +107,35 @@ int log_append_entry(log_t* me_, raft_entry_t* c)
         retval = me->cb->log_offer(me->raft, raft_get_udata(me->raft), c, me->back);
 
 
-    memcpy(&me->entries[me->back], c, sizeof(raft_entry_t));
+    memcpy(&me->entries[REL_POS(me->back, me->size)], c, sizeof(raft_entry_t));
     me->count++;
     me->back++;
-
     return retval;
 }
 
 raft_entry_t* log_get_from_idx(log_t* me_, int idx, int *n_etys)
 {
     log_private_t* me = (log_private_t*)me_;
-    int i;
+    int i, back;
 
+    /* idx starts at 1 */
     assert(0 <= idx - 1);
+    idx -= 1;
 
-    if (me->base + me->count < idx || idx < me->base)
+    if (me->front > idx || idx >= me->back)
     {
         *n_etys = 0;
         return NULL;
     }
 
-    /* idx starts at 1 */
-    idx -= 1;
 
-    i = (me->front + idx - me->base) % me->size;
+    i = REL_POS(idx, me->size);
+    back = REL_POS(me->back, me->size);
 
     int logs_till_end_of_log;
 
-    if (i < me->back)
-        logs_till_end_of_log = me->back - i;
+    if (i < back)
+        logs_till_end_of_log = back - i;
     else
         logs_till_end_of_log = me->size - i;
 
@@ -152,15 +148,17 @@ raft_entry_t* log_get_at_idx(log_t* me_, int idx)
     log_private_t* me = (log_private_t*)me_;
     int i;
 
-    assert(0 <= idx - 1);
-
-    if (me->base + me->count < idx || idx < me->base)
-        return NULL;
-
     /* idx starts at 1 */
+    assert(0 <= idx - 1);
     idx -= 1;
 
-    i = (me->front + idx - me->base) % me->size;
+    if (me->front > idx || idx >= me->back)
+    {
+      return NULL;
+    }
+
+
+    i = REL_POS(idx, me->size);
     return &me->entries[i];
 
 }
@@ -173,19 +171,17 @@ int log_count(log_t* me_)
 void log_delete(log_t* me_, int idx)
 {
     log_private_t* me = (log_private_t*)me_;
-    int end;
-
+    
     /* idx starts at 1 */
     idx -= 1;
-    idx -= me->base;
 
-    for (end = log_count(me_); idx < end; idx++)
-    {
-        if (me->cb && me->cb->log_pop)
-            me->cb->log_pop(me->raft, raft_get_udata(me->raft),
-                            &me->entries[me->back - 1], me->back);
-        me->back--;
-        me->count--;
+    while(me->back != idx) {
+      me->back--;
+      if (me->cb && me->cb->log_pop)
+	me->cb->log_pop(me->raft, raft_get_udata(me->raft),
+			&me->entries[REL_POS(me->back, me->size)], 
+			me->back);
+      me->count--;
     }
 }
 
@@ -196,14 +192,15 @@ void *log_poll(log_t * me_)
     if (0 == log_count(me_))
         return NULL;
 
-    const void *elem = &me->entries[me->front];
+    void *elem = &me->entries[REL_POS(me->front, me->size)];
     if (me->cb && me->cb->log_poll)
-        me->cb->log_poll(me->raft, raft_get_udata(me->raft),
-                         &me->entries[me->front], me->front);
+        me->cb->log_poll(me->raft, 
+			 raft_get_udata(me->raft),
+			 elem,
+			 me->front);
     me->front++;
     me->count--;
-    me->base++;
-    return (void*)elem;
+    return elem;
 }
 
 raft_entry_t *log_peektail(log_t * me_)
@@ -213,10 +210,7 @@ raft_entry_t *log_peektail(log_t * me_)
     if (0 == log_count(me_))
         return NULL;
 
-    if (0 == me->back)
-        return &me->entries[me->size - 1];
-    else
-        return &me->entries[me->back - 1];
+    return &me->entries[REL_POS(me->back - 1, me->size)];
 }
 
 void log_empty(log_t * me_)
@@ -239,5 +233,5 @@ void log_free(log_t * me_)
 int log_get_current_idx(log_t* me_)
 {
     log_private_t* me = (log_private_t*)me_;
-    return log_count(me_) + me->base;
+    return me->back;
 }

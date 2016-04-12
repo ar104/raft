@@ -50,12 +50,15 @@ raft_server_t* raft_new()
     me->current_term = 0;
     me->voted_for = -1;
     me->timeout_elapsed = 0;
+    me->last_compaction = 0;
     me->request_timeout = 200;
     me->election_timeout = 1000;
     me->log = log_new();
     me->voting_cfg_change_log_idx = -1;
     raft_set_state((raft_server_t*)me, RAFT_STATE_FOLLOWER);
     me->current_leader = NULL;
+    me->last_compaction_idx = me->last_applied_idx;
+    me->next_compaction_idx = me->last_applied_idx;
     return (raft_server_t*)me;
 }
 
@@ -175,6 +178,17 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
         if (-1 == raft_apply_entry(me_))
             return -1;
 
+    int i;
+    void *e;
+    if(me->election_timeout <= me->last_compaction) {
+      while(me->last_compaction_idx < me->next_compaction_idx) {
+	(void)log_poll(me->log);
+	me->last_compaction_idx++;
+      }
+      me->next_compaction_idx = me->last_applied_idx;
+      me->last_compaction = 0;
+    }
+    
     return 0;
 }
 

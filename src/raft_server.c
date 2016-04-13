@@ -178,21 +178,20 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
     if (me->last_applied_idx < me->commit_idx)
         if (-1 == raft_apply_entry(me_))
             return -1;
-    
-    /*
-    if(me->election_timeout <= me->last_compaction) {
-      if(me->last_compacted_idx != me->next_compaction_idx) {
-	fprintf(stderr, "Compaction\n");
-	fflush(stderr);
-      }
+
+    /* Compact every 5 seconds */
+    if(5000000 <= me->last_compaction) {
       while(me->last_compacted_idx < me->next_compaction_idx) {
 	(void)log_poll(me->log);
 	me->last_compacted_idx++;
       }
-      me->next_compaction_idx = me->last_applied_idx;
+      /* Must leave prev entry to properly generate appendentries msg */
+      if(me->last_applied_idx > 2) {
+	me->next_compaction_idx = me->last_applied_idx - 2;
+      }
       me->last_compaction = 0;
     }
-    */
+
     return 0;
 }
 

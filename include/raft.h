@@ -368,7 +368,7 @@ raft_node_t* raft_add_node(raft_server_t* me, void* user_data, int id, int is_se
 
 /** Add a node which does not participate in voting.
  * Parameters are identical to raft_add_node */
-raft_node_t* raft_add_non_voting_node(raft_server_t* me_, void* udata, int id, int is_self);
+raft_node_t* raft_add_non_voting_node(raft_server_t* me_, int checkpoint_idx, void* udata, int id, int is_self);
 
 /** Remove node.
  * @param node The node to be removed. */

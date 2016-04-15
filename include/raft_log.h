@@ -11,6 +11,8 @@ void log_free(log_t* me_);
 
 void log_clear(log_t* me_);
 
+void log_load_from_checkpoint(log_t* me_, int idx);
+
 /**
  * Add entry to log.
  * Don't add entry if we've already added this entry (based off ID)

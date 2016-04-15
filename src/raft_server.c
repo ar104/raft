@@ -62,6 +62,21 @@ raft_server_t* raft_new()
     return (raft_server_t*)me;
 }
 
+void raft_loaded_checkpoint(raft_server_t *me_, int term, int idx)
+{
+  raft_server_private_t* me = (raft_server_private_t*)me_;
+  me->current_term = term;
+  me->voted_for = -1;
+  raft_set_state((raft_server_t*)me, RAFT_STATE_FOLLOWER);
+  me->current_leader = NULL;
+  raft_set_commit_idx(me_, idx);
+  me->last_applied_idx = idx;
+  me->last_compacted_idx = me->last_applied_idx;
+  me->next_compaction_idx = me->last_applied_idx;
+}
+
+
+
 void raft_set_callbacks(raft_server_t* me_, raft_cbs_t* funcs, void* udata)
 {
     raft_server_private_t* me = (raft_server_private_t*)me_;

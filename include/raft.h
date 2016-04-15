@@ -667,4 +667,7 @@ int raft_entry_is_voting_cfg_change(raft_entry_t* ety);
  * @return 1 if this is a configuration change. */
 int raft_entry_is_cfg_change(raft_entry_t* ety);
 
+
+void raft_loaded_checkpoint(raft_server_t *me_, int term, int idx);
+
 #endif /* RAFT_H_ */

@@ -63,13 +63,13 @@ raft_server_t* raft_new()
     return (raft_server_t*)me;
 }
 
-void raft_loaded_checkpoint(raft_server_t *me_, int term, int idx)
+void raft_loaded_checkpoint(raft_server_t *me_, int term, int idx, int master)
 {
   raft_server_private_t* me = (raft_server_private_t*)me_;
   me->current_term = term;
   me->voted_for = -1;
   raft_set_state((raft_server_t*)me, RAFT_STATE_FOLLOWER);
-  me->current_leader = NULL;
+  me->current_leader = raft_get_node(me_, master);
   log_load_from_checkpoint(me->log, idx);
   raft_set_commit_idx(me_, idx);
   me->last_applied_idx = idx;

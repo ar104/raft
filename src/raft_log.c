@@ -66,7 +66,7 @@ static void __ensurecapacity(log_private_t * me)
 
 void log_load_from_checkpoint(log_t *me_, int idx)
 {
-  log_private_t* me = (log_private_t*)calloc(1, sizeof(log_private_t));
+  log_private_t* me = (log_private_t*)me_;
   me->front = me->back = idx;
 }
 

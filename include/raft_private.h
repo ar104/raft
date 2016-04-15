@@ -68,7 +68,7 @@ typedef struct {
     int voting_cfg_change_log_idx;
 
     /* Image build in progress */
-    int img_build_in_progress;
+    volatile int img_build_in_progress;
 
 } raft_server_private_t;
 

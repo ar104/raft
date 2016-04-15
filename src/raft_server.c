@@ -69,6 +69,7 @@ void raft_loaded_checkpoint(raft_server_t *me_, int term, int idx)
   me->voted_for = -1;
   raft_set_state((raft_server_t*)me, RAFT_STATE_FOLLOWER);
   me->current_leader = NULL;
+  log_load_from_checkpoint(me->log, idx);
   raft_set_commit_idx(me_, idx);
   me->last_applied_idx = idx;
   me->last_compacted_idx = me->last_applied_idx;

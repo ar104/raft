@@ -183,7 +183,9 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
         if (me->request_timeout <= me->timeout_elapsed)
             raft_send_appendentries_all(me_);
     }
-    else if (me->election_timeout <= me->timeout_elapsed)
+    // Dont become the leader if building images or bad things will happen
+    // when we get a client request
+    else if (me->election_timeout <= me->timeout_elapsed && !raft_get_img_build(me_))
     {
         if (1 < me->num_nodes)
             raft_election_start(me_);

@@ -66,6 +66,10 @@ typedef struct {
 
     /* the log which has a voting cfg change, otherwise -1 */
     int voting_cfg_change_log_idx;
+
+    /* Image build in progress */
+    int img_build_in_progress;
+
 } raft_server_private_t;
 
 void raft_election_start(raft_server_t* me);
@@ -77,6 +81,8 @@ void raft_become_follower(raft_server_t* me);
 void raft_vote(raft_server_t* me, raft_node_t* node);
 
 void raft_set_current_term(raft_server_t* me,int term);
+
+int raft_get_img_build(raft_server_t * me_);
 
 /**
  * @return 0 on error */

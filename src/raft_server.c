@@ -59,24 +59,9 @@ raft_server_t* raft_new()
     me->current_leader = NULL;
     me->last_compacted_idx = me->last_applied_idx;
     me->next_compaction_idx = me->last_applied_idx;
+    me->img_build_in_progress = 0;
     return (raft_server_t*)me;
 }
-
-void raft_loaded_checkpoint(raft_server_t *me_, int term, int idx)
-{
-  raft_server_private_t* me = (raft_server_private_t*)me_;
-  me->current_term = term;
-  me->voted_for = -1;
-  raft_set_state((raft_server_t*)me, RAFT_STATE_FOLLOWER);
-  me->current_leader = NULL;
-  log_load_from_checkpoint(me->log, idx);
-  raft_set_commit_idx(me_, idx);
-  me->last_applied_idx = idx;
-  me->last_compacted_idx = me->last_applied_idx;
-  me->next_compaction_idx = me->last_applied_idx;
-}
-
-
 
 void raft_set_callbacks(raft_server_t* me_, raft_cbs_t* funcs, void* udata)
 {
@@ -178,7 +163,6 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
     raft_server_private_t* me = (raft_server_private_t*)me_;
 
     me->timeout_elapsed += msec_since_last_period;
-    me->last_compaction += msec_since_last_period;
 
     if (me->state == RAFT_STATE_LEADER)
     {
@@ -191,23 +175,19 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
             raft_election_start(me_);
     }
 
-    if (me->last_applied_idx < me->commit_idx)
+    if (me->last_applied_idx < me->commit_idx && !raft_get_img_build(me_))
         if (-1 == raft_apply_entry(me_))
             return -1;
 
-    /* Compact every 5 seconds */
-    if(5000000 <= me->last_compaction) {
+    if(me->election_timeout <= me->last_compaction) {
       while(me->last_compacted_idx < me->next_compaction_idx) {
 	(void)log_poll(me->log);
 	me->last_compacted_idx++;
       }
-      /* Must leave prev entry to properly generate appendentries msg */
-      if(me->last_applied_idx > 2) {
-	me->next_compaction_idx = me->last_applied_idx - 2;
-      }
+      me->next_compaction_idx = me->last_applied_idx;
       me->last_compaction = 0;
     }
-
+    
     return 0;
 }
 
@@ -848,6 +828,8 @@ int raft_msg_entry_response_committed(raft_server_t* me_,
 
 int raft_apply_all(raft_server_t* me_)
 {
+    if(raft_get_img_build(me_))
+      return 0;
     while (raft_get_last_applied_idx(me_) < raft_get_commit_idx(me_))
     {
         int e = raft_apply_entry(me_);

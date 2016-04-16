@@ -887,7 +887,7 @@ int raft_entry_is_cfg_change(raft_entry_t* ety)
         RAFT_LOGTYPE_REMOVE_NODE == ety->type);
 }
 
-raft_entry_t *raft_last_applied_entry(raft_server_t *me_)
+raft_entry_t *raft_last_applied_ety(raft_server_t *me_)
 {
   raft_server_private_t* me = (raft_server_private_t*)me_;
   if(raft_get_last_applied_idx(me_) == 0)

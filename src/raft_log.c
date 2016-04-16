@@ -72,7 +72,7 @@ void log_load_from_checkpoint(log_t *me_,
   if(index > 0) {
     me->front = index - 1;
     me->back  = index;
-    memcpy(&me->entries[REL_POS(me->front, me->size)], c, sizeof(raft_entry_t));
+    memcpy(&me->entries[REL_POS(me->front, me->size)], entry, sizeof(raft_entry_t));
     me->count = 1;
   }
   else {

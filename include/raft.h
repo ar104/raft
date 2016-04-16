@@ -686,4 +686,7 @@ void raft_loaded_checkpoint(raft_server_t *me_,
 			    raft_entry_t *ety,
 			    int master);
 
+/* Get last applied entry */
+raft_entry_t *raft_last_applied_ety(raft_server_t *me_);
+
 #endif /* RAFT_H_ */

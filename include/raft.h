@@ -680,6 +680,10 @@ void raft_unset_img_build(raft_server_t *me_);
 /** Load raft state from checkpoint
  */
 
-void raft_loaded_checkpoint(raft_server_t *me_, int term, int idx, int master);
+void raft_loaded_checkpoint(raft_server_t *me_,
+			    int term,
+			    int idx,
+			    raft_entry_t *ety,
+			    int master);
 
 #endif /* RAFT_H_ */

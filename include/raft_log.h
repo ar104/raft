@@ -11,7 +11,7 @@ void log_free(log_t* me_);
 
 void log_clear(log_t* me_);
 
-void log_load_from_checkpoint(log_t* me_, int idx);
+void log_load_from_checkpoint(log_t* me_, int idx, raft_entry_t *entry);
 
 /**
  * Add entry to log.

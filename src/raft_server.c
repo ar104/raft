@@ -63,18 +63,30 @@ raft_server_t* raft_new()
     return (raft_server_t*)me;
 }
 
-void raft_loaded_checkpoint(raft_server_t *me_, int term, int idx, int master)
+void raft_loaded_checkpoint(raft_server_t *me_,
+			    int last_included_term,
+			    int last_included_index,
+			    raft_entry_t *last_included_entry,
+			    int master)
 {
   raft_server_private_t* me = (raft_server_private_t*)me_;
-  me->current_term = term;
+  me->current_term = last_included_term;
   me->voted_for = -1;
   raft_set_state((raft_server_t*)me, RAFT_STATE_FOLLOWER);
   me->current_leader = raft_get_node(me_, master);
-  log_load_from_checkpoint(me->log, idx);
-  raft_set_commit_idx(me_, idx);
-  me->last_applied_idx = idx;
-  me->last_compacted_idx = me->last_applied_idx;
-  me->next_compaction_idx = me->last_applied_idx;
+  log_load_from_checkpoint(me->log,
+			   last_included_index,
+			   last_included_entry);
+  raft_set_commit_idx(me_, last_included_index);
+  me->last_applied_idx = last_included_index;
+  if(me->last_applied_idx > 0) {
+    me->last_compacted_idx = me->last_applied_idx - 1;
+    me->next_compaction_idx = me->last_applied_idx - 1;
+  }
+  else {
+    me->last_compacted_idx  = 0;
+    me->next_compaction_idx = 0;
+  }
 }
 
 void raft_set_callbacks(raft_server_t* me_, raft_cbs_t* funcs, void* udata)
@@ -200,7 +212,9 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
 	(void)log_poll(me->log);
 	me->last_compacted_idx++;
       }
-      me->next_compaction_idx = me->last_applied_idx;
+      if(me->last_applied_idx > 1) {
+	me->next_compaction_idx = me->last_applied_idx - 1;
+      }
       me->last_compaction = 0;
     }
     

@@ -64,10 +64,21 @@ static void __ensurecapacity(log_private_t * me)
     me->entries = temp;
 }
 
-void log_load_from_checkpoint(log_t *me_, int idx)
+void log_load_from_checkpoint(log_t *me_,
+			      int index,
+			      raft_entry_t *entry)
 {
   log_private_t* me = (log_private_t*)me_;
-  me->front = me->back = (idx + 1);
+  if(index > 0) {
+    me->front = index - 1;
+    me->back  = index;
+    memcpy(&me->entries[REL_POS(me->front, me->size)], c, sizeof(raft_entry_t));
+    me->count = 1;
+  }
+  else {
+    me->front = me->back = 0;
+    me->count = 0;
+  }
 }
 
 log_t* log_new()

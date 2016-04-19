@@ -196,11 +196,13 @@ int raft_get_last_log_term(raft_server_t* me_)
 void raft_set_img_build(raft_server_t *me_)
 {
   ((raft_server_private_t*)me_)->img_build_in_progress = 1;
+  __sync_synchronize();
 }
 
 void raft_unset_img_build(raft_server_t *me_)
 {
   ((raft_server_private_t*)me_)->img_build_in_progress = 0;
+  __sync_synchronize();
 }
 
 int raft_get_img_build(raft_server_t *me_)

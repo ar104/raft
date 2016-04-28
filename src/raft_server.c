@@ -70,6 +70,9 @@ void raft_loaded_checkpoint(raft_server_t *me_,
 			    int master)
 {
   raft_server_private_t* me = (raft_server_private_t*)me_;
+  if(last_included_index == -1) {
+    return;
+  }
   me->current_term = last_included_term;
   me->voted_for = -1;
   raft_set_state((raft_server_t*)me, RAFT_STATE_FOLLOWER);

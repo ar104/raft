@@ -20,6 +20,9 @@ void log_load_from_checkpoint(log_t* me_, int idx, raft_entry_t *entry);
  * @return 0 if unsucessful; 1 otherwise */
 int log_append_entry(log_t* me_, raft_entry_t* c);
 
+/* And the batch version */
+int log_append_batch(log_t* me_, raft_entry_t* c, int count);
+
 /**
  * @return number of entries held within log */
 int log_count(log_t* me_);

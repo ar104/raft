@@ -267,6 +267,16 @@ typedef int (
     int entry_idx
     );
 
+typedef int (
+*func_logentry_event_batch_f
+)   (
+    raft_server_t* raft,
+    void *user_data,
+    raft_entry_t *entry,
+    int entry_idx,
+    int count
+    );
+
 typedef struct
 {
     /** Callback for sending request vote messages */
@@ -292,8 +302,9 @@ typedef struct
      * For safety reasons this callback MUST flush the change to disk.
      * Return 0 on success.
      * Return RAFT_ERR_SHUTDOWN if you want the server to shutdown. */
-    func_logentry_event_f log_offer;
-
+  func_logentry_event_f log_offer;
+  func_logentry_event_f log_offer_batch;
+  
     /** Callback for removing the oldest entry from the log
      * For safety reasons this callback MUST flush the change to disk.
      * @note If memory was malloc'd in log_offer then this should be the right
@@ -467,8 +478,13 @@ int raft_recv_requestvote_response(raft_server_t* me,
  *  RAFT_ERR_ONE_VOTING_CHANGE_ONLY there is a non-voting change inflight;
  */
 int raft_recv_entry(raft_server_t* me,
-                    msg_entry_t* ety,
-                    msg_entry_response_t *r);
+		    msg_entry_t* ety,
+		    msg_entry_response_t *r);
+
+int raft_recv_entry_batch(raft_server_t* me,
+			  msg_entry_t* ety,
+			  msg_entry_response_t *r,
+			  int count);
 
 /**
  * @return the server's node ID */
@@ -611,6 +627,10 @@ void raft_set_commit_idx(raft_server_t* me, int commit_idx);
  *  0 on success;
  *  RAFT_ERR_SHUTDOWN server should shutdown */
 int raft_append_entry(raft_server_t* me, raft_entry_t* ety);
+
+/* batch version */
+int raft_append_entry_batch(raft_server_t* me, raft_entry_t* ety, int count);
+
 
 /** Confirm if a msg_entry_response has been committed.
  * @param[in] r The response we want to check */

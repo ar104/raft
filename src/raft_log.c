@@ -64,6 +64,32 @@ static void __ensurecapacity(log_private_t * me)
     me->entries = temp;
 }
 
+static void __ensurecapacity_batch(log_private_t * me, int count)
+{
+    int i;
+    raft_entry_t *temp;
+
+    if ((me->count + count) <= me->size)
+        return;
+
+    while((me->count + count) > me->size) {
+      temp = (raft_entry_t*)calloc(1, sizeof(raft_entry_t) * me->size * 2);
+
+      for (i = me->front; i < me->back; i++)
+	{
+	  memcpy(&temp[REL_POS(i, 2*me->size)], 
+		 &me->entries[REL_POS(i, me->size)], 
+		 sizeof(raft_entry_t));
+	}
+
+      /* clean up old entries */
+      free(me->entries);
+      
+      me->size *= 2;
+      me->entries = temp;
+    }
+}
+
 void log_load_from_checkpoint(log_t *me_,
 			      int index,
 			      raft_entry_t *entry)
@@ -127,6 +153,30 @@ int log_append_entry(log_t* me_, raft_entry_t* c)
     memcpy(&me->entries[REL_POS(me->back, me->size)], c, sizeof(raft_entry_t));
     me->count++;
     me->back++;
+    return retval;
+}
+
+int log_append_batch(log_t* me_, raft_entry_t* c, int count)
+{
+    log_private_t* me = (log_private_t*)me_;
+
+    int retval = 0;
+
+    if (0 == c->id)
+        return -1;
+
+    __ensurecapacity_batch(me, count);
+
+    if (me->cb && me->cb->log_offer_batch)
+        retval = me->cb->log_offer_batch(me->raft,
+					 raft_get_udata(me->raft), c,
+					 count,
+					 me->back);
+
+
+    memcpy(&me->entries[REL_POS(me->back, me->size)], c, count*sizeof(raft_entry_t));
+    me->count += count;
+    me->back  += count;
     return retval;
 }
 

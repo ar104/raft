@@ -659,7 +659,7 @@ int raft_recv_entry_batch(raft_server_t* me_,
     for(i=0;i<count;i++) {
       __log(me_, NULL, "received entry t:%d id: %d idx: %d",
 	    me->current_term, (e + i)->id, raft_get_current_idx(me_) + 1);
-      (e + i)->term = current_term;
+      (e + i)->term = me->current_term;
     }
 
     raft_append_entry_batch(me_, e, count);

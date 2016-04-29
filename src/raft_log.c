@@ -170,8 +170,8 @@ int log_append_batch(log_t* me_, raft_entry_t* c, int count)
     if (me->cb && me->cb->log_offer_batch)
         retval = me->cb->log_offer_batch(me->raft,
 					 raft_get_udata(me->raft), c,
-					 count,
-					 me->back);
+					 me->back,
+					 count);
 
 
     memcpy(&me->entries[REL_POS(me->back, me->size)], c, count*sizeof(raft_entry_t));

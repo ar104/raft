@@ -725,7 +725,7 @@ int raft_append_entry_batch(raft_server_t* me_, raft_entry_t* ety, int count)
 {
     raft_server_private_t* me = (raft_server_private_t*)me_;
 
-    return log_append_entry_batch(me->log, ety, count);
+    return log_append_batch(me->log, ety, count);
 }
 
 int raft_apply_entry(raft_server_t* me_)

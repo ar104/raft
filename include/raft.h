@@ -303,7 +303,7 @@ typedef struct
      * Return 0 on success.
      * Return RAFT_ERR_SHUTDOWN if you want the server to shutdown. */
   func_logentry_event_f log_offer;
-  func_logentry_event_f log_offer_batch;
+  func_logentry_event_batch_f log_offer_batch;
   
     /** Callback for removing the oldest entry from the log
      * For safety reasons this callback MUST flush the change to disk.

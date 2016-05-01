@@ -434,19 +434,17 @@ int raft_recv_appendentries(
     }
 
     /* Pick up remainder in case of mismatch or missing entry */
+    if(i < ae->n_entries) {
+      raft_append_entry_batch(me_, 
+			      &ae->entries[i],
+			      ae->n_entries - i);
+    }
+    
     for (; i < ae->n_entries; i++)
     {
-        int e = raft_append_entry(me_, &ae->entries[i]);
-        if (-1 == e)
-            goto fail_with_current_idx;
-        else if (RAFT_ERR_SHUTDOWN == e)
-        {
-            r->success = 0;
-            r->first_idx = 0;
-            return RAFT_ERR_SHUTDOWN;
-        }
         r->current_idx = ae->prev_log_idx + 1 + i;
     }
+
 
     /* 4. If leaderCommit > commitIndex, set commitIndex =
         min(leaderCommit, index of most recent entry) */
@@ -795,9 +793,6 @@ int raft_send_appendentries(raft_server_t* me_, raft_node_t* node)
         raft_entry_t* prev_ety = raft_get_entry_from_idx(me_, next_idx - 1);
 	if(prev_ety == NULL) {
 	  // We've already compacted this entry...
-	  fprintf(stderr, 
-		  "WARNING: node %d has dropped too far behind\n",
-		  raft_node_get_id(node));
 	  return 0;
 	}
         ae.prev_log_idx = next_idx - 1;

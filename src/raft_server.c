@@ -658,9 +658,11 @@ int raft_recv_entry_batch(raft_server_t* me_,
 
     for(i=0;i<count;i++) {
       __log(me_, NULL, "received entry t:%d id: %d idx: %d",
-	    me->current_term, (e + i)->id, raft_get_current_idx(me_) + 1);
+	    me->current_term, (e + i)->id, raft_get_current_idx(me_) + i + 1);
       (e + i)->term = me->current_term;
     }
+
+    int next_curr_idx = raft_get_current_idx(me_) + 1;
 
     raft_append_entry_batch(me_, e, count);
 
@@ -674,7 +676,7 @@ int raft_recv_entry_batch(raft_server_t* me_,
          * Don't send the entry to peers who are behind, to prevent them from
          * becoming congested. */
         int next_idx = raft_node_get_next_idx(me->nodes[i]);
-        if (next_idx == raft_get_current_idx(me_))
+        if (next_idx == next_curr_idx)
             raft_send_appendentries(me_, me->nodes[i]);
     }
 
@@ -682,10 +684,11 @@ int raft_recv_entry_batch(raft_server_t* me_,
     if (1 == me->num_nodes)
         me->commit_idx = raft_get_current_idx(me_);
 
-    r->id = e->id;
-    r->idx = raft_get_current_idx(me_);
-    r->term = me->current_term;
-
+    for(i=0;i<count;i++,r++) {
+      r->id = e->id;
+      r->idx = raft_get_current_idx(me_);
+      r->term = me->current_term;
+    } 
     if (raft_entry_is_voting_cfg_change(e))
         me->voting_cfg_change_log_idx = raft_get_current_idx(me_);
 

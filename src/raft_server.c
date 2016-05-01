@@ -317,7 +317,7 @@ int raft_recv_appendentries_response(raft_server_t* me_,
         if (0 < match_idx)
         {
             raft_entry_t* ety = raft_get_entry_from_idx(me_, match_idx);
-            if (ety->term == me->current_term && point <= match_idx)
+            if (ety && ety->term == me->current_term && point <= match_idx)
                 votes++;
         }
     }

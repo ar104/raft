@@ -174,7 +174,15 @@ int log_append_batch(log_t* me_, raft_entry_t* c, int count)
 					 count);
 
 
-    memcpy(&me->entries[REL_POS(me->back, me->size)], c, count*sizeof(raft_entry_t));
+    if(REL_POS(me->back + count - 1, me->size) >= REL_POS(me->back, me->size)) {
+      memcpy(&me->entries[REL_POS(me->back, me->size)], c, count*sizeof(raft_entry_t));
+    }
+    else {
+      int part1 = me->size - REL_POS(me->back, me->size);
+      memcpy(&me->entries[REL_POS(me->back, me->size)], c, part1*sizeof(raft_entry_t));
+      memcpy(&me->entries[0], c + part1, (count - part1)*sizeof(raft_entry_t));
+    }
+
     me->count += count;
     me->back  += count;
     return retval;
@@ -265,11 +273,13 @@ void *log_poll(log_t * me_)
         return NULL;
 
     void *elem = &me->entries[REL_POS(me->front, me->size)];
+
     if (me->cb && me->cb->log_poll)
         me->cb->log_poll(me->raft, 
 			 raft_get_udata(me->raft),
 			 elem,
-			 me->front);
+    			 me->front);
+
     me->front++;
     me->count--;
     return elem;

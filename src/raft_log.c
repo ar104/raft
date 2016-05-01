@@ -186,7 +186,10 @@ raft_entry_t* log_get_from_idx(log_t* me_, int idx, int *n_etys)
     int i, back;
 
     /* idx starts at 1 */
-    assert(0 <= idx - 1);
+    if(idx == 0) {
+      *n_etys = 0;
+      return NULL;
+    }
     idx -= 1;
 
     if (me->front > idx || idx >= me->back)
@@ -216,7 +219,9 @@ raft_entry_t* log_get_at_idx(log_t* me_, int idx)
     int i;
 
     /* idx starts at 1 */
-    assert(0 <= idx - 1);
+    if(idx == 0) {
+      return NULL;
+    }
     idx -= 1;
 
     if (me->front > idx || idx >= me->back)

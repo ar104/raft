@@ -192,6 +192,7 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
     raft_server_private_t* me = (raft_server_private_t*)me_;
 
     me->timeout_elapsed += msec_since_last_period;
+    me->last_compaction += msec_since_last_period;
 
     if (me->state == RAFT_STATE_LEADER)
     {
@@ -215,8 +216,8 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
 	(void)log_poll(me->log);
 	me->last_compacted_idx++;
       }
-      if(me->last_applied_idx > 1) {
-	me->next_compaction_idx = me->last_applied_idx - 1;
+      if(me->last_applied_idx > 50) {
+	me->next_compaction_idx = me->last_applied_idx - 50;
       }
       me->last_compaction = 0;
     }
@@ -788,14 +789,19 @@ int raft_send_appendentries(raft_server_t* me_, raft_node_t* node)
     int next_idx = raft_node_get_next_idx(node);
 
     ae.entries = raft_get_entries_from_idx(me_, next_idx, &ae.n_entries);
-
     /* previous log is the log just before the new logs */
     if (1 < next_idx)
     {
         raft_entry_t* prev_ety = raft_get_entry_from_idx(me_, next_idx - 1);
+	if(prev_ety == NULL) {
+	  // We've already compacted this entry...
+	  fprintf(stderr, 
+		  "WARNING: node %d has dropped too far behind\n",
+		  raft_node_get_id(node));
+	  return 0;
+	}
         ae.prev_log_idx = next_idx - 1;
-        if (prev_ety)
-            ae.prev_log_term = prev_ety->term;
+	ae.prev_log_term = prev_ety->term;
     }
 
     __log(me_, node, "sending appendentries node: ci:%d t:%d lc:%d pli:%d plt:%d",

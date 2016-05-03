@@ -355,6 +355,12 @@ int raft_recv_appendentries(
               ae->prev_log_term,
               ae->n_entries);
 
+    if(ae->prev_log_term == -1) {
+      fprintf(stderr, "Node log is too far behind ... shutting down.\n");
+      fflush(stderr);
+      exit(-1);
+    }
+
     r->term = me->current_term;
 
     if (raft_is_candidate(me_) && me->current_term == ae->term)
@@ -793,10 +799,12 @@ int raft_send_appendentries(raft_server_t* me_, raft_node_t* node)
         raft_entry_t* prev_ety = raft_get_entry_from_idx(me_, next_idx - 1);
 	if(prev_ety == NULL) {
 	  // We've already compacted this entry...
-	  return 0;
+	  ae.prev_log_term = -1;
+	}
+	else {
+	  ae.prev_log_term = prev_ety->term;
 	}
         ae.prev_log_idx = next_idx - 1;
-	ae.prev_log_term = prev_ety->term;
     }
 
     __log(me_, node, "sending appendentries node: ci:%d t:%d lc:%d pli:%d plt:%d",

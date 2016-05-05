@@ -207,9 +207,12 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
             raft_election_start(me_);
     }
 
-    if (me->last_applied_idx < me->commit_idx && !raft_get_img_build(me_))
-        if (-1 == raft_apply_entry(me_))
-            return -1;
+    if (me->last_applied_idx < me->commit_idx && !raft_get_img_build(me_)) {
+      while(me->last_applied_idx < me->commit_idx) {
+	if (-1 == raft_apply_entry(me_))
+	  return -1;
+      }
+    }
 
     if(me->election_timeout <= me->last_compaction) {
       while(me->last_compacted_idx < me->next_compaction_idx) {

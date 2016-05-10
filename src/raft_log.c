@@ -141,9 +141,6 @@ int log_append_entry(log_t* me_, raft_entry_t* c)
 
     int retval = 0;
 
-    if (0 == c->id)
-        return -1;
-
     __ensurecapacity(me);
 
     if (me->cb && me->cb->log_offer)
@@ -161,9 +158,6 @@ int log_append_batch(log_t* me_, raft_entry_t* c, int count)
     log_private_t* me = (log_private_t*)me_;
 
     int retval = 0;
-
-    if (0 == c->id)
-        return -1;
 
     __ensurecapacity_batch(me, count);
 

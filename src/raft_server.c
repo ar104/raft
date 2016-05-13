@@ -194,6 +194,12 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
     me->timeout_elapsed += msec_since_last_period;
     me->last_compaction += msec_since_last_period;
 
+    /* Only one voting node means it's safe for us to become the leader */
+    if (1 == raft_get_num_voting_nodes(me_) &&
+        raft_node_is_voting(raft_get_my_node((void*)me)) &&
+        !raft_is_leader(me_))
+        raft_become_leader(me_);
+
     if (me->state == RAFT_STATE_LEADER)
     {
         if (me->request_timeout <= me->timeout_elapsed)
@@ -325,7 +331,7 @@ int raft_recv_appendentries_response(raft_server_t* me_,
         }
     }
 
-    if (me->num_nodes / 2 < votes && raft_get_commit_idx(me_) < point)
+    if (raft_get_num_voting_nodes(me_) / 2 < votes && raft_get_commit_idx(me_) < point)
         raft_set_commit_idx(me_, point);
 
     /* Aggressively send remaining entries */

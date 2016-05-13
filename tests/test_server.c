@@ -22,6 +22,14 @@ void TestRaft_server_voted_for_records_who_we_voted_for(CuTest * tc)
     CuAssertTrue(tc, 2 == raft_get_voted_for(r));
 }
 
+void TestRaft_server_get_my_node(CuTest * tc)
+{
+    void *r = raft_new();
+    raft_node_t* me = raft_add_node(r, NULL, 1, 1);
+    raft_add_node(r, NULL, 2, 0);
+    CuAssertTrue(tc, me == raft_get_my_node(r));
+}
+
 void TestRaft_server_idx_starts_at_1(CuTest * tc)
 {
     void *r = raft_new();
@@ -185,6 +193,39 @@ void TestRaft_server_append_entry_is_retrievable(CuTest * tc)
     CuAssertTrue(tc, kept->data.buf == ety.data.buf);
 }
 
+static int __raft_logentry_offer(
+    raft_server_t* raft,
+    void *udata,
+    raft_entry_t *ety,
+    int ety_idx
+    )
+{
+    CuAssertIntEquals(udata, ety_idx, 0);
+    ety->data.buf = udata;
+    return 0;
+}
+
+void TestRaft_server_append_entry_user_can_set_data_buf(CuTest * tc)
+{
+    raft_cbs_t funcs = {
+        .log_offer = __raft_logentry_offer,
+    };
+
+    void *r = raft_new();
+    raft_set_state(r, RAFT_STATE_CANDIDATE);
+    raft_set_callbacks(r, &funcs, tc);
+    raft_set_current_term(r, 5);
+    raft_entry_t ety = {};
+    ety.term = 1;
+    ety.id = 100;
+    ety.data.len = 4;
+    ety.data.buf = (unsigned char*)"aaa";
+    raft_append_entry(r, &ety);
+    raft_entry_t* kept =  raft_get_entry_from_idx(r, 1);
+    CuAssertTrue(tc, NULL != kept->data.buf);
+    CuAssertTrue(tc, kept->data.buf == ety.data.buf);
+}
+
 #if 0
 /* TODO: no support for duplicate detection yet */
 void
@@ -335,7 +376,20 @@ void TestRaft_server_periodic_elapses_election_timeout(CuTest * tc)
     CuAssertTrue(tc, 100 == raft_get_timeout_elapsed(r));
 }
 
-void TestRaft_server_election_timeout_does_no_promote_us_to_leader_if_there_is_only_1_node(CuTest * tc)
+void TestRaft_server_election_timeout_does_not_promote_us_to_leader_if_there_is_are_more_than_1_nodes(CuTest * tc)
+{
+    void *r = raft_new();
+    raft_add_node(r, NULL, 1, 1);
+    raft_add_node(r, NULL, 2, 0);
+    raft_set_election_timeout(r, 1000);
+
+    /* clock over (ie. 1000 + 1), causing new election */
+    raft_periodic(r, 1001);
+
+    CuAssertTrue(tc, 0 == raft_is_leader(r));
+}
+
+void TestRaft_server_election_timeout_does_promote_us_to_leader_if_there_is_only_1_node(CuTest * tc)
 {
     void *r = raft_new();
     raft_add_node(r, NULL, 1, 1);
@@ -344,7 +398,20 @@ void TestRaft_server_election_timeout_does_no_promote_us_to_leader_if_there_is_o
     /* clock over (ie. 1000 + 1), causing new election */
     raft_periodic(r, 1001);
 
-    CuAssertTrue(tc, 0 == raft_is_leader(r));
+    CuAssertTrue(tc, 1 == raft_is_leader(r));
+}
+
+void TestRaft_server_election_timeout_does_promote_us_to_leader_if_there_is_only_1_voting_node(CuTest * tc)
+{
+    void *r = raft_new();
+    raft_add_node(r, NULL, 1, 1);
+    raft_add_non_voting_node(r, NULL, 2, 0);
+    raft_set_election_timeout(r, 1000);
+
+    /* clock over (ie. 1000 + 1), causing new election */
+    raft_periodic(r, 1001);
+
+    CuAssertTrue(tc, 1 == raft_is_leader(r));
 }
 
 void TestRaft_server_recv_entry_auto_commits_if_we_are_the_only_node(CuTest * tc)
@@ -1946,6 +2013,57 @@ void TestRaft_leader_recv_appendentries_response_increase_commit_idx_when_majori
     CuAssertIntEquals(tc, 2, raft_get_commit_idx(r));
     raft_periodic(r, 1);
     CuAssertIntEquals(tc, 2, raft_get_last_applied_idx(r));
+}
+
+void TestRaft_leader_recv_appendentries_response_increase_commit_idx_using_voting_nodes_majority(
+    CuTest * tc)
+{
+    raft_cbs_t funcs = {
+        .send_appendentries          = sender_appendentries,
+        .log                         = NULL
+    };
+    msg_appendentries_response_t aer;
+
+    void *sender = sender_new(NULL);
+    void *r = raft_new();
+    raft_add_node(r, NULL, 1, 1);
+    raft_add_node(r, NULL, 2, 0);
+    raft_add_node(r, NULL, 3, 0);
+    raft_add_non_voting_node(r, NULL, 4, 0);
+    raft_add_non_voting_node(r, NULL, 5, 0);
+    raft_set_callbacks(r, &funcs, sender);
+
+    /* I'm the leader */
+    raft_set_state(r, RAFT_STATE_LEADER);
+    raft_set_current_term(r, 1);
+    raft_set_commit_idx(r, 0);
+    /* the last applied idx will became 1, and then 2 */
+    raft_set_last_applied_idx(r, 0);
+
+    /* append entries - we need two */
+    raft_entry_t ety = {};
+    ety.term = 1;
+    ety.id = 1;
+    ety.data.buf = "aaaa";
+    ety.data.len = 4;
+    raft_append_entry(r, &ety);
+
+    memset(&aer, 0, sizeof(msg_appendentries_response_t));
+
+    /* FIRST entry log application */
+    /* send appendentries -
+     * server will be waiting for response */
+    raft_send_appendentries(r, raft_get_node(r, 2));
+    /* receive mock success responses */
+    aer.term = 1;
+    aer.success = 1;
+    aer.current_idx = 1;
+    aer.first_idx = 1;
+    raft_recv_appendentries_response(r, raft_get_node(r, 2), &aer);
+    CuAssertIntEquals(tc, 1, raft_get_commit_idx(r));
+    /* leader will now have majority followers who have appended this log */
+    raft_periodic(r, 1);
+    CuAssertIntEquals(tc, 1, raft_get_last_applied_idx(r));
 }
 
 void TestRaft_leader_recv_appendentries_response_duplicate_does_not_decrement_match_idx(

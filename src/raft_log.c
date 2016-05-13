@@ -138,15 +138,13 @@ void log_clear(log_t* me_)
 int log_append_entry(log_t* me_, raft_entry_t* c)
 {
     log_private_t* me = (log_private_t*)me_;
-
     int retval = 0;
 
     __ensurecapacity(me);
 
     if (me->cb && me->cb->log_offer)
-        retval = me->cb->log_offer(me->raft, raft_get_udata(me->raft), c, me->back);
-
-
+      retval = me->cb->log_offer(me->raft, raft_get_udata(me->raft), c, me->back);
+    
     memcpy(&me->entries[REL_POS(me->back, me->size)], c, sizeof(raft_entry_t));
     me->count++;
     me->back++;

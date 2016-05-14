@@ -224,7 +224,8 @@ typedef int (
 )   (
     raft_server_t* raft,
     void *user_data,
-    raft_entry_t* ety
+    raft_entry_t* ety,
+    int ety_idx
     );
 
 /** Callback for saving who we voted for to disk.

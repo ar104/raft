@@ -325,6 +325,7 @@ typedef struct
     /** Callback for catching debugging log messages
      * This callback is optional */
     func_log_f log;
+    func_log_f log_election;
 } raft_cbs_t;
 
 typedef struct

@@ -41,6 +41,19 @@ static void __log(raft_server_t *me_, raft_node_t* node, const char *fmt, ...)
         me->cb.log(me_, node, me->udata, buf);
 }
 
+static void __log_election(raft_server_t *me_, raft_node_t* node, const char *fmt, ...)
+{
+    raft_server_private_t* me = (raft_server_private_t*)me_;
+    char buf[1024];
+    va_list args;
+
+    va_start(args, fmt);
+    vsprintf(buf, fmt, args);
+
+    if (me->cb.log_election)
+        me->cb.log_election(me_, node, me->udata, buf);
+}
+
 raft_server_t* raft_new()
 {
     raft_server_private_t* me =
@@ -131,9 +144,9 @@ void raft_election_start(raft_server_t* me_)
 {
     raft_server_private_t* me = (raft_server_private_t*)me_;
 
-    __log(me_, NULL, "election starting: %d %d, term: %d ci: %d",
-          me->election_timeout, me->timeout_elapsed, me->current_term,
-          raft_get_current_idx(me_));
+    __log_election(me_, NULL, "election starting: %d %d, term: %d ci: %d",
+		   me->election_timeout, me->timeout_elapsed, me->current_term,
+		   raft_get_current_idx(me_));
 
     raft_become_candidate(me_);
 }
@@ -143,7 +156,7 @@ void raft_become_leader(raft_server_t* me_)
     raft_server_private_t* me = (raft_server_private_t*)me_;
     int i;
 
-    __log(me_, NULL, "becoming leader term:%d", raft_get_current_term(me_));
+    __log_election(me_, NULL, "becoming leader term:%d", raft_get_current_term(me_));
 
     raft_set_state(me_, RAFT_STATE_LEADER);
     for (i = 0; i < me->num_nodes; i++)
@@ -163,7 +176,7 @@ void raft_become_candidate(raft_server_t* me_)
     raft_server_private_t* me = (raft_server_private_t*)me_;
     int i;
 
-    __log(me_, NULL, "becoming candidate");
+    __log_election(me_, NULL, "becoming candidate");
 
     raft_set_current_term(me_, raft_get_current_term(me_) + 1);
     for (i = 0; i < me->num_nodes; i++)
@@ -183,7 +196,7 @@ void raft_become_candidate(raft_server_t* me_)
 
 void raft_become_follower(raft_server_t* me_)
 {
-    __log(me_, NULL, "becoming follower");
+    __log_election(me_, NULL, "becoming follower");
     raft_set_state(me_, RAFT_STATE_FOLLOWER);
 }
 
@@ -547,8 +560,8 @@ int raft_recv_requestvote(raft_server_t* me_,
     else
         r->vote_granted = 0;
 
-    __log(me_, node, "node requested vote: %d replying: %s",
-          node, r->vote_granted == 1 ? "granted" : "not granted");
+    __log_election(me_, node, "node requested vote: %d replying: %s",
+		   node, r->vote_granted == 1 ? "granted" : "not granted");
 
     r->term = raft_get_current_term(me_);
     return 0;
@@ -568,8 +581,8 @@ int raft_recv_requestvote_response(raft_server_t* me_,
 {
     raft_server_private_t* me = (raft_server_private_t*)me_;
 
-    __log(me_, node, "node responded to requestvote status: %s",
-          r->vote_granted == 1 ? "granted" : "not granted");
+    __log_election(me_, node, "node responded to requestvote status: %s",
+		   r->vote_granted == 1 ? "granted" : "not granted");
 
     if (!raft_is_candidate(me_))
     {
@@ -589,7 +602,7 @@ int raft_recv_requestvote_response(raft_server_t* me_,
         return 0;
     }
 
-    __log(me_, node, "node responded to requestvote: %d status: %s ct:%d rt:%d",
+    __log_election(me_, node, "node responded to requestvote: %d status: %s ct:%d rt:%d",
           node, r->vote_granted == 1 ? "granted" : "not granted",
           me->current_term,
           r->term);

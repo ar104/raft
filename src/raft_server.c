@@ -351,8 +351,12 @@ int raft_recv_appendentries_response(raft_server_t* me_,
     if (raft_get_entry_from_idx(me_, raft_node_get_next_idx(node)))
         raft_send_appendentries(me_, node);
 
-    /* periodic applies committed entries lazily */
-
+    if (me->last_applied_idx < me->commit_idx && !raft_get_img_build(me_)) {
+      while(me->last_applied_idx < me->commit_idx) {
+	if (-1 == raft_apply_entry(me_))
+	  break;
+      }
+    }
     return 0;
 }
 

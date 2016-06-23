@@ -315,9 +315,6 @@ typedef struct
     /** Callback for sending appendentries messages */
     func_send_appendentries_f send_appendentries;
 
-    /** Callback for triggering assisted replication */
-    func_send_appendentries_f assisted_send_appendentries;
-  
     /** Callback for finite state machine application
      * Return 0 on success.
      * Return RAFT_ERR_SHUTDOWN if you want the server to shutdown. */

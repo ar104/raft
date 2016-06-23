@@ -468,7 +468,8 @@ int raft_recv_appendentries(
     if(i < ae->n_entries) {
       raft_append_entry_batch(me_, 
 			      &ae->entries[i],
-			      ae->n_entries - i);
+			      ae->n_entries - i,
+			      NULL);
     }
     
     for (; i < ae->n_entries; i++)
@@ -628,7 +629,8 @@ int raft_recv_entry(raft_server_t* me_,
 {
     raft_server_private_t* me = (raft_server_private_t*)me_;
     int i;
-
+    replicant_t rep;
+    
     /* Only one voting cfg change at a time */
     if (raft_entry_is_voting_cfg_change(e))
         if (-1 != me->voting_cfg_change_log_idx)
@@ -644,8 +646,12 @@ int raft_recv_entry(raft_server_t* me_,
     ety.term = me->current_term;
     ety.id = e->id;
     ety.type = e->type;
+    
+    rep.leader_term       = me->current_term;
+    rep.leader_commit_idx = me->commit_idx;  
+    
     memcpy(&ety.data, &e->data, sizeof(raft_entry_data_t));
-    raft_append_entry(me_, &ety);
+    raft_append_entry(me_, &ety, &rep);
     for (i = 0; i < me->num_nodes; i++)
     {
         if (me->node == me->nodes[i] || !me->nodes[i] ||
@@ -682,7 +688,8 @@ int raft_recv_entry_batch(raft_server_t* me_,
 {
     raft_server_private_t* me = (raft_server_private_t*)me_;
     int i;
-
+    replicant_t rep;
+    
     if (!raft_is_leader(me_))
         return RAFT_ERR_NOT_LEADER;
 
@@ -694,7 +701,9 @@ int raft_recv_entry_batch(raft_server_t* me_,
 
     int next_curr_idx = raft_get_current_idx(me_) + 1;
 
-    raft_append_entry_batch(me_, e, count);
+    rep.leader_term       = me->current_term;
+    rep.leader_commit_idx = me->commit_idx;
+    raft_append_entry_batch(me_, e, count, &rep);
 
     for (i = 0; i < me->num_nodes; i++)
     {
@@ -744,21 +753,21 @@ int raft_send_requestvote(raft_server_t* me_, raft_node_t* node)
     return 0;
 }
 
-int raft_append_entry(raft_server_t* me_, raft_entry_t* ety)
+int raft_append_entry(raft_server_t* me_, raft_entry_t* ety, replicant_t *rep)
 {
     raft_server_private_t* me = (raft_server_private_t*)me_;
 
     if (raft_entry_is_voting_cfg_change(ety))
         me->voting_cfg_change_log_idx = raft_get_current_idx(me_);
 
-    return log_append_entry(me->log, ety);
+    return log_append_entry(me->log, ety, rep);
 }
 
-int raft_append_entry_batch(raft_server_t* me_, raft_entry_t* ety, int count)
+int raft_append_entry_batch(raft_server_t* me_, raft_entry_t* ety, int count, replicant_t *rep)
 {
     raft_server_private_t* me = (raft_server_private_t*)me_;
 
-    return log_append_batch(me->log, ety, count);
+    return log_append_batch(me->log, ety, count, rep);
 }
 
 int raft_apply_entry(raft_server_t* me_)

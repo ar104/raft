@@ -135,19 +135,16 @@ void log_clear(log_t* me_)
     me->front = 0;
 }
 
-int log_append_entry(log_t* me_, raft_entry_t* c)
+int log_append_entry(log_t* me_, raft_entry_t* c, replicant_t *rep)
 {
     log_private_t* me = (log_private_t*)me_;
     int retval = 0;
 
     __ensurecapacity(me);
 
-    int prev_log_idx  = 0;
-    int prev_log_term = 0;
-
-    if(me->count > 0) {
-      prev_log_idx   = me->back - 1;
-      prev_log_term  = me->entries[REL_POS(me->back, me->size)].term;
+    if(rep != NULL && me->count > 0) {
+      rep->prev_idx  = me->back;
+      rep->prev_term = me->entries[REL_POS(me->back - 1, me->size)].term;
     }
     
     if (me->cb && me->cb->log_offer)
@@ -155,8 +152,7 @@ int log_append_entry(log_t* me_, raft_entry_t* c)
 				 raft_get_udata(me->raft),
 				 c,
 				 me->back,
-				 prev_log_idx,
-				 prev_log_term);
+				 rep);
 
     memcpy(&me->entries[REL_POS(me->back, me->size)], c, sizeof(raft_entry_t));
     me->count++;
@@ -164,7 +160,7 @@ int log_append_entry(log_t* me_, raft_entry_t* c)
     return retval;
 }
 
-int log_append_batch(log_t* me_, raft_entry_t* c, int count)
+int log_append_batch(log_t* me_, raft_entry_t* c, int count, replicant_t *rep)
 {
     log_private_t* me = (log_private_t*)me_;
 
@@ -172,12 +168,9 @@ int log_append_batch(log_t* me_, raft_entry_t* c, int count)
 
     __ensurecapacity_batch(me, count);
 
-    int prev_log_idx  = 0;
-    int prev_log_term = 0;
-
-    if(me->count > 0) {
-      prev_log_idx   = me->back - 1;
-      prev_log_term  = me->entries[REL_POS(me->back, me->size)].term;
+    if(rep != NULL && me->count > 0) {
+      rep->prev_idx  = me->back;
+      rep->prev_term = me->entries[REL_POS(me->back - 1, me->size)].term;
     }
     
     if (me->cb && me->cb->log_offer_batch)
@@ -185,9 +178,7 @@ int log_append_batch(log_t* me_, raft_entry_t* c, int count)
 					 raft_get_udata(me->raft), c,
 					 me->back,
 					 count,
-					 prev_log_idx,
-					 prev_log_term);
-
+					 rep);
 
     if(REL_POS(me->back + count - 1, me->size) >= REL_POS(me->back, me->size)) {
       memcpy(&me->entries[REL_POS(me->back, me->size)], c, count*sizeof(raft_entry_t));

@@ -51,6 +51,13 @@ typedef struct
     raft_entry_data_t data;
 } raft_entry_t;
 
+typedef struct {
+  unsigned int leader_term;
+  unsigned int leader_commit_idx;
+  unsigned int prev_idx;
+  unsigned int prev_term;
+} replicant_t;
+
 /** Message sent from client to server.
  * The client sends this message to a server with the intention of having it
  * applied to the FSM. */
@@ -286,8 +293,7 @@ typedef int (
     void *user_data,
     raft_entry_t *entry,
     int entry_idx,
-    int prev_idx,
-    int prev_term
+    replicant_t *rep
     );
 
 typedef int (
@@ -298,8 +304,7 @@ typedef int (
     raft_entry_t *entry,
     int entry_idx,
     int count,
-    int prev_idx,
-    int prev_term
+    replicant_t *rep
     );
 
 typedef struct
@@ -310,6 +315,9 @@ typedef struct
     /** Callback for sending appendentries messages */
     func_send_appendentries_f send_appendentries;
 
+    /** Callback for triggering assisted replication */
+    func_send_appendentries_f assisted_send_appendentries;
+  
     /** Callback for finite state machine application
      * Return 0 on success.
      * Return RAFT_ERR_SHUTDOWN if you want the server to shutdown. */
@@ -327,8 +335,8 @@ typedef struct
      * For safety reasons this callback MUST flush the change to disk.
      * Return 0 on success.
      * Return RAFT_ERR_SHUTDOWN if you want the server to shutdown. */
-  func_logentry_offer_f log_offer;
-  func_logentry_offer_batch_f log_offer_batch;
+    func_logentry_offer_f log_offer;
+    func_logentry_offer_batch_f log_offer_batch;
   
     /** Callback for removing the oldest entry from the log
      * For safety reasons this callback MUST flush the change to disk.
@@ -660,10 +668,10 @@ void raft_set_commit_idx(raft_server_t* me, int commit_idx);
  * @return
  *  0 on success;
  *  RAFT_ERR_SHUTDOWN server should shutdown */
-int raft_append_entry(raft_server_t* me, raft_entry_t* ety);
+int raft_append_entry(raft_server_t* me, raft_entry_t* ety, replicant_t *rep);
 
 /* batch version */
-int raft_append_entry_batch(raft_server_t* me, raft_entry_t* ety, int count);
+int raft_append_entry_batch(raft_server_t* me, raft_entry_t* ety, int count, replicant_t *rep);
 
 
 /** Confirm if a msg_entry_response has been committed.

@@ -142,9 +142,22 @@ int log_append_entry(log_t* me_, raft_entry_t* c)
 
     __ensurecapacity(me);
 
-    if (me->cb && me->cb->log_offer)
-      retval = me->cb->log_offer(me->raft, raft_get_udata(me->raft), c, me->back);
+    int prev_log_idx  = 0;
+    int prev_log_term = 0;
+
+    if(me->count > 0) {
+      prev_log_idx   = me->back - 1;
+      prev_log_term  = me->entries[REL_POS(me->back, me->size)].term;
+    }
     
+    if (me->cb && me->cb->log_offer)
+      retval = me->cb->log_offer(me->raft,
+				 raft_get_udata(me->raft),
+				 c,
+				 me->back,
+				 prev_log_idx,
+				 prev_log_term);
+
     memcpy(&me->entries[REL_POS(me->back, me->size)], c, sizeof(raft_entry_t));
     me->count++;
     me->back++;
@@ -159,11 +172,21 @@ int log_append_batch(log_t* me_, raft_entry_t* c, int count)
 
     __ensurecapacity_batch(me, count);
 
+    int prev_log_idx  = 0;
+    int prev_log_term = 0;
+
+    if(me->count > 0) {
+      prev_log_idx   = me->back - 1;
+      prev_log_term  = me->entries[REL_POS(me->back, me->size)].term;
+    }
+    
     if (me->cb && me->cb->log_offer_batch)
         retval = me->cb->log_offer_batch(me->raft,
 					 raft_get_udata(me->raft), c,
 					 me->back,
-					 count);
+					 count,
+					 prev_log_idx,
+					 prev_log_term);
 
 
     if(REL_POS(me->back + count - 1, me->size) >= REL_POS(me->back, me->size)) {

@@ -279,6 +279,29 @@ typedef int (
     int count
     );
 
+typedef int (
+*func_logentry_offer_f
+)   (
+    raft_server_t* raft,
+    void *user_data,
+    raft_entry_t *entry,
+    int entry_idx,
+    int prev_idx,
+    int prev_term
+    );
+
+typedef int (
+*func_logentry_offer_batch_f
+)   (
+    raft_server_t* raft,
+    void *user_data,
+    raft_entry_t *entry,
+    int entry_idx,
+    int count,
+    int prev_idx,
+    int prev_term
+    );
+
 typedef struct
 {
     /** Callback for sending request vote messages */
@@ -304,8 +327,8 @@ typedef struct
      * For safety reasons this callback MUST flush the change to disk.
      * Return 0 on success.
      * Return RAFT_ERR_SHUTDOWN if you want the server to shutdown. */
-  func_logentry_event_f log_offer;
-  func_logentry_event_batch_f log_offer_batch;
+  func_logentry_offer_f log_offer;
+  func_logentry_offer_batch_f log_offer_batch;
   
     /** Callback for removing the oldest entry from the log
      * For safety reasons this callback MUST flush the change to disk.

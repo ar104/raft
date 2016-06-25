@@ -59,6 +59,7 @@ typedef struct {
   unsigned int prev_term;
   int client_id;
   int client_mc;
+  int channel_seq;
   raft_entry_t ety;
 } replicant_t;
 
@@ -311,6 +312,12 @@ typedef int (
     replicant_t *rep
     );
 
+typedef void (
+*func_client_assist_ok_f
+) (
+   replicant_t *rep
+   );
+
 typedef struct
 {
     /** Callback for sending request vote messages */
@@ -318,6 +325,9 @@ typedef struct
 
     /** Callback for sending appendentries messages */
     func_send_appendentries_f send_appendentries;
+
+    /** Callback to send a positive response to client assist */
+    func_client_assist_ok_f client_assist_ok;
 
     /** Callback for finite state machine application
      * Return 0 on success.

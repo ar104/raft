@@ -18,6 +18,7 @@
 
 #include "raft.h"
 #include "raft_log.h"
+#include "raft_log_cache.h"
 #include "raft_private.h"
 
 #ifndef min
@@ -67,6 +68,7 @@ raft_server_t* raft_new()
     me->request_timeout = 200;
     me->election_timeout = 1000;
     me->log = log_new();
+    me->log_cache = log_cache_new();
     me->voting_cfg_change_log_idx = -1;
     raft_set_state((raft_server_t*)me, RAFT_STATE_FOLLOWER);
     me->current_leader = NULL;
@@ -360,6 +362,44 @@ int raft_recv_appendentries_response(raft_server_t* me_,
     return 0;
 }
 
+static void apply_log_cache(raft_server_t *me)
+{
+  raft_server_private_t* me = (raft_server_private_t*)me_;
+  int prev_idx = 0, prev_term = 0;
+  while(true) {
+    int ety_index = raft_get_current_idx(me_);
+    raft_entry_t* existing_ety = raft_get_entry_from_idx(me_, ety_index);
+    if(existing_ety) {
+      prev_idx  = ety_index;
+      prev_term = existing_ety->term; 
+    }
+    replicant_t *c = log_cache_get_next(me->log_cache,
+					prev_idx,
+					prev_term);
+    if(c != NULL) {
+      msg_appendentries_t ety;
+      msg_appendentries_response_t dummy;
+      ety.term = me->current_term;
+      ety.prev_log_idx = prev_idx;
+      ety.prev_log_term = prev_term;
+      ety.leader_commit = c->leader_commit;
+      if(ety.leader_commit < me->commit_idx) {
+	ety.leader_commit = me->commit_idx;
+      }
+      ety.n_entries = 1;
+      ety.entries = &c->ety;
+      raft_recv_appendentries(me_,
+			      me->current_leader,
+			      &ety,
+			      &dummy);
+      free(c->ety.data.buf);
+    }
+    else {
+      break;
+    }
+  }
+}
+
 int raft_recv_appendentries(
     raft_server_t* me_,
     raft_node_t* node,
@@ -491,6 +531,10 @@ int raft_recv_appendentries(
 
     r->success = 1;
     r->first_idx = ae->prev_log_idx + 1;
+
+    log_cache_set_head(me->log_cache, me->current_term, raft_get_current_idx(me_));
+    apply_log_cache(me_);
+    
     return 0;
 
 fail_with_current_idx:
@@ -499,6 +543,36 @@ fail:
     r->success = 0;
     r->first_idx = 0;
     return -1;
+}
+
+void raft_recv_assisted_appendentries(raft_server_t* me_,
+				      replicant_t *rep,
+				      void *data);
+{
+  raft_server_private_t* me = (raft_server_private_t*)me_;
+  /* Monotonically advance term */
+  if (raft_is_candidate(me_) && me->current_term == rep->leader_term) {
+    raft_become_follower(me_);
+    me->current_leader = leader;
+  }
+  if (me->current_term < rep->leader_term) {
+    raft_set_current_term(me_, rep->leader_term);
+    raft_become_follower(me_);
+    me->current_leader = raft_get_node(me_, rep->server_id);
+  }
+  else if (rep->leader_term < me->current_term)
+  {
+    // Stale entry - drop.
+    return;
+  }
+  log_cache_set_head(me->log_cache, rep->leader_term, raft_get_current_idx(me_));
+  if(log_cache_contains(me->log_cache, rep->prev_log_idx + 1)) {
+    void *tmp = malloc(rep->ety.data.len);
+    memcpy(tmp, rep->ety.data.buf, rep->ety.data.len);
+    rep->ety.data.buf = tmp;
+    log_cache_add(me->log_cache, rep);
+  }
+  apply_log_cache(me_);
 }
 
 int raft_already_voted(raft_server_t* me_)

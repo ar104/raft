@@ -142,9 +142,15 @@ int log_append_entry(log_t* me_, raft_entry_t* c, replicant_t *rep)
 
     __ensurecapacity(me);
 
-    if(rep != NULL && me->count > 0) {
-      rep->prev_idx  = me->back;
-      rep->prev_term = me->entries[REL_POS(me->back - 1, me->size)].term;
+    if(rep != NULL){
+      if(me->count > 0) {
+	rep->prev_idx  = me->back;
+	rep->prev_term = me->entries[REL_POS(me->back - 1, me->size)].term;
+      }
+      else {
+	rep->prev_idx  = 0;
+	rep->prev_term = 0;
+      }
     }
     
     if (me->cb && me->cb->log_offer)
@@ -168,9 +174,15 @@ int log_append_batch(log_t* me_, raft_entry_t* c, int count, replicant_t *rep)
 
     __ensurecapacity_batch(me, count);
 
-    if(rep != NULL && me->count > 0) {
-      rep->prev_idx  = me->back;
-      rep->prev_term = me->entries[REL_POS(me->back - 1, me->size)].term;
+    if(rep != NULL){
+      if(me->count > 0) {
+	rep->prev_idx  = me->back;
+	rep->prev_term = me->entries[REL_POS(me->back - 1, me->size)].term;
+      }
+      else {
+	rep->prev_idx  = 0;
+	rep->prev_term = 0;
+      }
     }
     
     if (me->cb && me->cb->log_offer_batch)

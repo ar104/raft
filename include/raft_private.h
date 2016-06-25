@@ -1,6 +1,8 @@
 #ifndef RAFT_PRIVATE_H_
 #define RAFT_PRIVATE_H_
 
+#include "raft_log_cache.h"
+
 /**
  * Copyright (c) 2013, Willem-Hendrik Thiart
  * Use of this source code is governed by a BSD-style license that can be
@@ -25,7 +27,10 @@ typedef struct {
     void* log;
 
     /* Volatile state: */
-
+  
+    /* Log cache */
+    log_cache_t *log_cache;
+  
     /* idx of highest log entry known to be committed */
     int commit_idx;
 

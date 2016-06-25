@@ -53,9 +53,13 @@ typedef struct
 
 typedef struct {
   unsigned int leader_term;
+  unsigned int server_id;
   unsigned int leader_commit_idx;
   unsigned int prev_idx;
   unsigned int prev_term;
+  int client_id;
+  int client_mc;
+  raft_entry_t ety;
 } replicant_t;
 
 /** Message sent from client to server.
@@ -452,6 +456,12 @@ int raft_recv_appendentries(raft_server_t* me,
                             raft_node_t* node,
                             msg_appendentries_t* ae,
                             msg_appendentries_response_t *r);
+
+/* client assist version */
+void raft_recv_assisted_appendentries(raft_server_t* me,
+				      node_t * leader,
+				      msg_appendentries_t *rep,
+				      void *data);
 
 /** Receive a response from an appendentries message we sent.
  * @param[in] node The node who sent us this message

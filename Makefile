@@ -24,7 +24,7 @@ SHAREDFLAGS = -shared
 SHAREDEXT = so
 endif
 
-OBJECTS = raft_server.o raft_server_properties.o raft_node.o raft_log.o
+OBJECTS = raft_server.o raft_server_properties.o raft_node.o raft_log.o raft_log_cache.o
 
 all: static shared
 

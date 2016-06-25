@@ -22,9 +22,9 @@ log_cache_t* log_cache_new()
     me->leader_term  = 0;
     me->count        = 0;
     me->window_start = 0;
-    memset(is_valid, 0, CAPACITY);
+    memset(me->is_valid, 0, CAPACITY);
     me->entries = (replicant_t *)calloc(1, sizeof(replicant_t) * CAPACITY);
-    me->is_valid = (char *)calloc(char, CAPACITY);
+    me->is_valid = (char *)calloc(sizeof(char), CAPACITY);
     return (log_cache_t*)me;
 }
 
@@ -46,9 +46,9 @@ void log_cache_set_head(log_cache_t *me,
 
   while(me->window_start != idx) {
     int pos = REL_POS(me->window_start);
-    if(is_valid[pos]) {
-      free(entries[pos].ety.data.buf);
-      is_valid[pos] = 0;
+    if(me->is_valid[pos]) {
+      free(me->entries[pos].ety.data.buf);
+      me->is_valid[pos] = 0;
     }
     me->window_start++;
   }
@@ -59,8 +59,8 @@ replicant_t* log_cache_get_next(log_cache_t *me,
 				int prev_idx,
 				int prev_term)
 {
-  int pos = REL_POS(window_start);
-  if(!is_valid[pos]) {
+  int pos = REL_POS(me->window_start);
+  if(!me->is_valid[pos]) {
     return NULL;
   }
   replicant_t *e = &me->entries[pos];
@@ -68,7 +68,7 @@ replicant_t* log_cache_get_next(log_cache_t *me,
     return NULL;
   }
   me->window_start++;
-  is_valid[pos] = 0;
+  me->is_valid[pos] = 0;
   return e;
 }
 
@@ -78,8 +78,8 @@ replicant_t* log_cache_get_next(log_cache_t *me,
 void log_cache_add(log_cache_t* me,
 		   replicant_t *rep)
 {
-  entries[REL_POS(rep->prev_idx + 1)]  = *rep;
-  is_valid[REL_POS(rep->prev_idx + 1)] = 1;
+  me->entries[REL_POS(rep->prev_idx + 1)]  = *rep;
+  me->is_valid[REL_POS(rep->prev_idx + 1)] = 1;
 }
 
 int log_cache_contains(log_cache_t *me, int idx)

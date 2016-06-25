@@ -362,11 +362,11 @@ int raft_recv_appendentries_response(raft_server_t* me_,
     return 0;
 }
 
-static void apply_log_cache(raft_server_t *me)
+static void apply_log_cache(raft_server_t *me_)
 {
   raft_server_private_t* me = (raft_server_private_t*)me_;
   int prev_idx = 0, prev_term = 0;
-  while(true) {
+  while(1) {
     int ety_index = raft_get_current_idx(me_);
     raft_entry_t* existing_ety = raft_get_entry_from_idx(me_, ety_index);
     if(existing_ety) {
@@ -382,7 +382,7 @@ static void apply_log_cache(raft_server_t *me)
       ety.term = me->current_term;
       ety.prev_log_idx = prev_idx;
       ety.prev_log_term = prev_term;
-      ety.leader_commit = c->leader_commit;
+      ety.leader_commit = c->leader_commit_idx;
       if(ety.leader_commit < me->commit_idx) {
 	ety.leader_commit = me->commit_idx;
       }
@@ -545,15 +545,13 @@ fail:
     return -1;
 }
 
-void raft_recv_assisted_appendentries(raft_server_t* me_,
-				      replicant_t *rep,
-				      void *data);
+void raft_recv_assisted_appendentries(raft_server_t* me_, replicant_t *rep)
 {
   raft_server_private_t* me = (raft_server_private_t*)me_;
   /* Monotonically advance term */
   if (raft_is_candidate(me_) && me->current_term == rep->leader_term) {
     raft_become_follower(me_);
-    me->current_leader = leader;
+    me->current_leader = raft_get_node(me_, rep->server_id);
   }
   if (me->current_term < rep->leader_term) {
     raft_set_current_term(me_, rep->leader_term);
@@ -566,7 +564,7 @@ void raft_recv_assisted_appendentries(raft_server_t* me_,
     return;
   }
   log_cache_set_head(me->log_cache, rep->leader_term, raft_get_current_idx(me_));
-  if(log_cache_contains(me->log_cache, rep->prev_log_idx + 1)) {
+  if(log_cache_contains(me->log_cache, rep->prev_idx + 1)) {
     void *tmp = malloc(rep->ety.data.len);
     memcpy(tmp, rep->ety.data.buf, rep->ety.data.len);
     rep->ety.data.buf = tmp;

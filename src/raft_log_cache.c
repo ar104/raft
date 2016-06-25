@@ -12,22 +12,6 @@
 // This should be the maximum number of clients
 #define CAPACITY 10000
 
-typedef struct
-{
-  /* Current term of the leader */
-  int leader_term;
-
-  /* the amount of elements in the array */
-  int count;
-  
-  /* window */
-  int window_start;
-  char is_valid[CAPACITY];
-  
-  replicant_t * entries;
-  
-} log_cache_t;
-
 #define REL_POS(_i) ((_i) % (CAPACITY))
 
 log_cache_t* log_cache_new()
@@ -40,6 +24,7 @@ log_cache_t* log_cache_new()
     me->window_start = 0;
     memset(is_valid, 0, CAPACITY);
     me->entries = (replicant_t *)calloc(1, sizeof(replicant_t) * CAPACITY);
+    me->is_valid = (char *)calloc(char, CAPACITY);
     return (log_cache_t*)me;
 }
 

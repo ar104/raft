@@ -459,9 +459,7 @@ int raft_recv_appendentries(raft_server_t* me,
 
 /* client assist version */
 void raft_recv_assisted_appendentries(raft_server_t* me,
-				      node_t * leader,
-				      msg_appendentries_t *rep,
-				      void *data);
+				      replicant_t *rep);
 
 /** Receive a response from an appendentries message we sent.
  * @param[in] node The node who sent us this message

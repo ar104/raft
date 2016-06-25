@@ -314,9 +314,9 @@ typedef int (
 
 typedef void (
 *func_client_assist_ok_f
-) (
-   replicant_t *rep
-   );
+	      ) ( void *user_data,
+		  replicant_t *rep
+		  );
 
 typedef struct
 {

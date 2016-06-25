@@ -397,7 +397,7 @@ static void apply_log_cache(raft_server_t *me_)
       /* Entry accepted ? */
       if(dummy.success == 1) {
 	if(me->cb.client_assist_ok) {
-	  me->cb.client_assist_ok(c);
+	  me->cb.client_assist_ok(me->udata, c);
 	}
       }
     }

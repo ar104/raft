@@ -388,11 +388,12 @@ static void apply_log_cache(raft_server_t *me_)
       }
       ety.n_entries = 1;
       ety.entries = &c->ety;
+      void *tmp = c->ety.data.buf;
       raft_recv_appendentries(me_,
 			      me->current_leader,
 			      &ety,
 			      &dummy);
-      free(c->ety.data.buf);
+      free(tmp);
     }
     else {
       break;

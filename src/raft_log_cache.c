@@ -22,7 +22,6 @@ log_cache_t* log_cache_new()
     me->leader_term  = 0;
     me->count        = 0;
     me->window_start = 0;
-    memset(me->is_valid, 0, CAPACITY);
     me->entries = (replicant_t *)calloc(1, sizeof(replicant_t) * CAPACITY);
     me->is_valid = (char *)calloc(sizeof(char), CAPACITY);
     return (log_cache_t*)me;

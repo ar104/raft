@@ -10,7 +10,7 @@
 #include "raft_log_cache.h"
 
 // This should be the maximum number of clients
-#define CAPACITY 10000
+#define CAPACITY 1000
 
 #define REL_POS(_i) ((_i) % (CAPACITY))
 
@@ -26,6 +26,17 @@ log_cache_t* log_cache_new()
     me->entries = (replicant_t *)calloc(1, sizeof(replicant_t) * CAPACITY);
     me->is_valid = (char *)calloc(sizeof(char), CAPACITY);
     return (log_cache_t*)me;
+}
+
+void log_cache_clear(log_cache_t *me)
+{
+  int i;
+  for(i=0;i<CAPACITY;i++) {
+    if(me->is_valid[i]) {
+      free(me->entries[i].ety.data.buf);
+      me->is_valid[i] = 0;
+    }
+  }
 }
 
 void log_cache_set_head(log_cache_t *me,

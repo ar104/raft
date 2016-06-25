@@ -532,7 +532,9 @@ int raft_recv_appendentries(
     r->success = 1;
     r->first_idx = ae->prev_log_idx + 1;
 
-    log_cache_set_head(me->log_cache, me->current_term, raft_get_current_idx(me_));
+    log_cache_set_head(me->log_cache, 
+		       me->current_term, 
+		       raft_get_current_idx(me_) + 1);
     apply_log_cache(me_);
     
     return 0;
@@ -563,7 +565,9 @@ void raft_recv_assisted_appendentries(raft_server_t* me_, replicant_t *rep)
     // Stale entry - drop.
     return;
   }
-  log_cache_set_head(me->log_cache, rep->leader_term, raft_get_current_idx(me_));
+  log_cache_set_head(me->log_cache, 
+		     rep->leader_term, 
+		     raft_get_current_idx(me_) + 1);
   if(log_cache_contains(me->log_cache, rep->prev_idx + 1)) {
     void *tmp = malloc(rep->ety.data.len);
     memcpy(tmp, rep->ety.data.buf, rep->ety.data.len);

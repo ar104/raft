@@ -471,6 +471,13 @@ int raft_recv_appendentries(raft_server_t* me,
 void raft_recv_assisted_appendentries(raft_server_t* me,
 				      replicant_t *rep);
 
+
+/* Final quorum from client assist */
+void raft_recv_assisted_quorum(raft_server_t *me,
+			       replicant_t *rep,
+			       unsigned long quorum);
+
+
 /** Receive a response from an appendentries message we sent.
  * @param[in] node The node who sent us this message
  * @param[in] r The appendentries response message

@@ -362,6 +362,26 @@ int raft_recv_appendentries_response(raft_server_t* me_,
     return 0;
 }
 
+void raft_recv_assisted_quorum(raft_server_t *me_,
+			       replicant_t *rep,
+			       unsigned long quorum)
+{
+  int i;
+  msg_appendentries_response_t resp;
+  for(i=0;i<8*sizeof(unsigned long);i++) {
+    if(quorum & (1UL << i)) {
+      raft_node_t *node = raft_get_node(me_, i);
+      resp.term        = rep->leader_term;
+      resp.success     = 1;
+      resp.current_idx = rep->prev_idx + 1;
+      resp.first_idx   = rep->prev_idx + 1;
+      raft_recv_appendentries_response(me_,
+				       node,
+				       &resp);
+    }
+  }
+}
+
 static void apply_log_cache(raft_server_t *me_)
 {
   raft_server_private_t* me = (raft_server_private_t*)me_;

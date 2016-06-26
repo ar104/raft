@@ -754,6 +754,8 @@ int raft_recv_entry(raft_server_t* me_,
     rep.leader_term       = me->current_term;
     rep.leader_commit_idx = me->commit_idx;  
     send_cnt = 0;
+    int next_curr_idx = raft_get_current_idx(me_) + 1;
+
     for (i = 0; i < me->num_nodes; i++)
       {
         if (me->node == me->nodes[i] || !me->nodes[i] ||
@@ -764,7 +766,7 @@ int raft_recv_entry(raft_server_t* me_,
          * Don't send the entry to peers who are behind, to prevent them from
          * becoming congested. */
         int next_idx = raft_node_get_next_idx(me->nodes[i]);
-        if (next_idx == raft_get_current_idx(me_))
+        if (next_idx == next_curr_idx)
 	  send_cnt++;
     }
     

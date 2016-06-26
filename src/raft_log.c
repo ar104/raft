@@ -20,6 +20,8 @@
 #define INITIAL_CAPACITY 10
 #define in(x) ((log_private_t*)x)
 
+#define BITMAP_SIZE(sz) (((sz) + 7)/8)
+
 typedef struct
 {
     /* size of array */
@@ -32,7 +34,8 @@ typedef struct
     int front, back; // Absolute idx
 
     raft_entry_t* entries;
-
+    unsigned char* assisted;
+  
     /* callbacks */
     raft_cbs_t *cb;
     void* raft;
@@ -40,28 +43,70 @@ typedef struct
 
 #define REL_POS(_i, _s) ((_i) % (_s))
 
+int is_assisted(log_private_t * me, int idx)
+{
+  int pos = REL_POS(idx, me->size);
+  int offset_byte = pos/8;
+  unsigned char offset_mask = 1 << (pos % 8);
+  return (me->assisted[offset_byte] & offset_mask) == 0 ? 0:1;
+}
+
+void set_assisted(log_private_t *me, int idx)
+{
+  int pos = REL_POS(idx, me->size);
+  int offset_byte = pos/8;
+  unsigned char offset_mask = 1 << (pos % 8);
+  me->assisted[offset_byte] |=  offset_mask;
+}
+
+void reset_assisted(log_private_t *me, int idx)
+{
+  int pos = REL_POS(idx, me->size);
+  int offset_byte = pos/8;
+  unsigned char offset_mask = 1 << (pos % 8);
+  me->assisted[offset_byte] &=  ~offset_mask;
+}
+
+void set_assisted_bit(unsigned char *map,
+		      int size,
+		      int idx,
+		      int bit)
+{
+  int pos = REL_POS(idx, size);
+  int offset_byte = pos/8;
+  unsigned char offset_mask = (bit) << (pos % 8);
+  map[offset_byte] |=  offset_mask;
+}
+
 static void __ensurecapacity(log_private_t * me)
 {
     int i;
     raft_entry_t *temp;
-
+    unsigned long *temp_assisted;
+    
     if (me->count < me->size)
         return;
 
     temp = (raft_entry_t*)calloc(1, sizeof(raft_entry_t) * me->size * 2);
-
+    temp_assisted = (unsigned char *)BITMAP_SIZE(2*me->size);
+    
     for (i = me->front; i < me->back; i++)
     {
       memcpy(&temp[REL_POS(i, 2*me->size)], 
 	     &me->entries[REL_POS(i, me->size)], 
 	     sizeof(raft_entry_t));
+      set_assisted_bit(temp_assisted,
+		       2*me->size,
+		       i,
+		       is_assisted(me, i));
     }
 
     /* clean up old entries */
     free(me->entries);
-
+    free(me->assisted);
     me->size *= 2;
     me->entries = temp;
+    me->assisted = temp_assisted;
 }
 
 static void __ensurecapacity_batch(log_private_t * me, int count)
@@ -74,19 +119,25 @@ static void __ensurecapacity_batch(log_private_t * me, int count)
 
     while((me->count + count) > me->size) {
       temp = (raft_entry_t*)calloc(1, sizeof(raft_entry_t) * me->size * 2);
-
+      temp_assisted = (unsigned char *)BITMAP_SIZE(2*me->size);
+      
       for (i = me->front; i < me->back; i++)
 	{
 	  memcpy(&temp[REL_POS(i, 2*me->size)], 
 		 &me->entries[REL_POS(i, me->size)], 
 		 sizeof(raft_entry_t));
+	  set_assisted_bit(temp_assisted,
+		       2*me->size,
+		       i,
+		       is_assisted(me, i));
 	}
 
       /* clean up old entries */
       free(me->entries);
-      
+      free(me->assisted);
       me->size *= 2;
       me->entries = temp;
+      me->assisted = temp_assisted;
     }
 }
 
@@ -116,6 +167,7 @@ log_t* log_new()
     me->count = 0;
     me->back = in(me)->front = 0;
     me->entries = (raft_entry_t*)calloc(1, sizeof(raft_entry_t) * me->size);
+    me->assisted = (unsigned char *)calloc(1, BITMAP_SIZE(me->size));
     return (log_t*)me;
 }
 
@@ -151,6 +203,7 @@ int log_append_entry(log_t* me_, raft_entry_t* c, replicant_t *rep)
 	rep->prev_idx  = 0;
 	rep->prev_term = 0;
       }
+      set_assisted(me, me->back);
     }
     
     if (me->cb && me->cb->log_offer)
@@ -169,9 +222,9 @@ int log_append_entry(log_t* me_, raft_entry_t* c, replicant_t *rep)
 int log_append_batch(log_t* me_, raft_entry_t* c, int count, replicant_t *rep)
 {
     log_private_t* me = (log_private_t*)me_;
-
     int retval = 0;
-
+    int i;
+    
     __ensurecapacity_batch(me, count);
 
     if(rep != NULL){
@@ -182,6 +235,9 @@ int log_append_batch(log_t* me_, raft_entry_t* c, int count, replicant_t *rep)
       else {
 	rep->prev_idx  = 0;
 	rep->prev_term = 0;
+      }
+      for(i=0;i<count;i++) {
+	set_assisted(me, me->back + i);
       }
     }
     
@@ -279,6 +335,7 @@ void log_delete(log_t* me_, int idx)
 	me->cb->log_pop(me->raft, raft_get_udata(me->raft),
 			&me->entries[REL_POS(me->back, me->size)], 
 			me->back);
+      reset_assisted(me, me->back);
       me->count--;
     }
 }
@@ -298,6 +355,7 @@ void *log_poll(log_t * me_)
 			 elem,
     			 me->front);
 
+    reset_assisted(me, me->front);
     me->front++;
     me->count--;
     return elem;
@@ -327,6 +385,7 @@ void log_free(log_t * me_)
     log_private_t* me = (log_private_t*)me_;
 
     free(me->entries);
+    free(me->assisted);
     free(me);
 }
 

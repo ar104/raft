@@ -255,6 +255,15 @@ raft_entry_t* raft_get_entry_from_idx(raft_server_t* me_, int etyidx)
     return log_get_at_idx(me->log, etyidx);
 }
 
+int raft_is_assisted(raft_server_t* me_, int etyidx)
+{
+    raft_server_private_t* me = (raft_server_private_t*)me_;
+    if(etyidx == 0)
+      return 0;
+    else
+      return is_assisted(me->log, etyidx - 1);
+}
+
 int raft_recv_appendentries_response(raft_server_t* me_,
                                      raft_node_t* node,
                                      msg_appendentries_response_t* r)
@@ -351,6 +360,7 @@ int raft_recv_appendentries_response(raft_server_t* me_,
 
     /* Aggressively send remaining entries */
     if (raft_get_entry_from_idx(me_, raft_node_get_next_idx(node)))
+      if (!raft_is_assisted(me_, raft_node_get_next_idx(node)))
         raft_send_appendentries(me_, node);
 
     if (me->last_applied_idx < me->commit_idx && !raft_get_img_build(me_)) {

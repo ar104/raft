@@ -733,7 +733,8 @@ int raft_recv_entry(raft_server_t* me_,
     raft_server_private_t* me = (raft_server_private_t*)me_;
     int i;
     replicant_t rep;
-    
+    int send_cnt;
+
     /* Only one voting cfg change at a time */
     if (raft_entry_is_voting_cfg_change(e))
         if (-1 != me->voting_cfg_change_log_idx)
@@ -752,9 +753,28 @@ int raft_recv_entry(raft_server_t* me_,
     
     rep.leader_term       = me->current_term;
     rep.leader_commit_idx = me->commit_idx;  
+    send_cnt = 0;
+    for (i = 0; i < me->num_nodes; i++)
+      {
+        if (me->node == me->nodes[i] || !me->nodes[i] ||
+            !raft_node_is_voting(me->nodes[i]))
+            continue;
+
+        /* Only send new entries.
+         * Don't send the entry to peers who are behind, to prevent them from
+         * becoming congested. */
+        int next_idx = raft_node_get_next_idx(me->nodes[i]);
+        if (next_idx == raft_get_current_idx(me_))
+	  send_cnt++;
+    }
     
-    memcpy(&ety.data, &e->data, sizeof(raft_entry_data_t));
-    raft_append_entry(me_, &ety, &rep);
+    if(send_cnt <= (me->num_nodes/2)) {
+      raft_append_entry(me_, &ety, &rep);
+    }
+    else {
+      raft_append_entry(me_, &ety, NULL);
+    }
+
     for (i = 0; i < me->num_nodes; i++)
     {
         if (me->node == me->nodes[i] || !me->nodes[i] ||
@@ -792,7 +812,8 @@ int raft_recv_entry_batch(raft_server_t* me_,
     raft_server_private_t* me = (raft_server_private_t*)me_;
     int i;
     replicant_t rep;
-    
+    int send_cnt;
+
     if (!raft_is_leader(me_))
         return RAFT_ERR_NOT_LEADER;
 
@@ -806,7 +827,27 @@ int raft_recv_entry_batch(raft_server_t* me_,
 
     rep.leader_term       = me->current_term;
     rep.leader_commit_idx = me->commit_idx;
-    raft_append_entry_batch(me_, e, count, &rep);
+    send_cnt = 0;
+    for (i = 0; i < me->num_nodes; i++)
+    {
+        if (me->node == me->nodes[i] || !me->nodes[i] ||
+            !raft_node_is_voting(me->nodes[i]))
+            continue;
+
+        /* Only send new entries.
+         * Don't send the entry to peers who are behind, to prevent them from
+         * becoming congested. */
+        int next_idx = raft_node_get_next_idx(me->nodes[i]);
+        if (next_idx == next_curr_idx)
+	  send_cnt++;
+    }
+    
+    if(send_cnt <= (me->num_nodes/2)) {
+      raft_append_entry_batch(me_, e, count, &rep);
+    }
+    else {
+      raft_append_entry_batch(me_, e, count, NULL);
+    }
 
     for (i = 0; i < me->num_nodes; i++)
     {

@@ -261,7 +261,7 @@ int raft_is_assisted(raft_server_t* me_, int etyidx)
     if(etyidx == 0)
       return 0;
     else
-      return is_assisted(me->log, etyidx - 1);
+      return is_assisted_public(me->log, etyidx - 1);
 }
 
 int raft_recv_appendentries_response(raft_server_t* me_,

@@ -59,6 +59,11 @@ void set_assisted(log_private_t *me, int idx)
   me->assisted[offset_byte] |=  offset_mask;
 }
 
+int is_assisted_public(log_t *me_, int idx)
+{
+  return is_assisted((log_private_t *)me_, idx);
+}
+
 void reset_assisted(log_private_t *me, int idx)
 {
   int pos = REL_POS(idx, me->size);
@@ -82,13 +87,13 @@ static void __ensurecapacity(log_private_t * me)
 {
     int i;
     raft_entry_t *temp;
-    unsigned long *temp_assisted;
+    unsigned char *temp_assisted;
     
     if (me->count < me->size)
         return;
 
     temp = (raft_entry_t*)calloc(1, sizeof(raft_entry_t) * me->size * 2);
-    temp_assisted = (unsigned char *)BITMAP_SIZE(2*me->size);
+    temp_assisted = (unsigned char *)calloc(1, BITMAP_SIZE(2*me->size));
     
     for (i = me->front; i < me->back; i++)
     {
@@ -113,13 +118,14 @@ static void __ensurecapacity_batch(log_private_t * me, int count)
 {
     int i;
     raft_entry_t *temp;
+    unsigned char *temp_assisted;
 
     if ((me->count + count) <= me->size)
         return;
 
     while((me->count + count) > me->size) {
       temp = (raft_entry_t*)calloc(1, sizeof(raft_entry_t) * me->size * 2);
-      temp_assisted = (unsigned char *)BITMAP_SIZE(2*me->size);
+      temp_assisted = (unsigned char *)calloc(1, BITMAP_SIZE(2*me->size));
       
       for (i = me->front; i < me->back; i++)
 	{

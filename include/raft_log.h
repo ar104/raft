@@ -23,7 +23,7 @@ int log_append_entry(log_t* me_, raft_entry_t* c, replicant_t *rep);
 /* And the batch version */
 int log_append_batch(log_t* me_, raft_entry_t* c, int count, replicant_t *rep);
 
-int is_assisted(log_t *me_, int idx);
+int is_assisted_public(log_t *me_, int idx);
 
 /**
  * @return number of entries held within log */

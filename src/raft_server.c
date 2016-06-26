@@ -750,7 +750,8 @@ int raft_recv_entry(raft_server_t* me_,
     ety.term = me->current_term;
     ety.id = e->id;
     ety.type = e->type;
-    
+    memcpy(&ety.data, &e->data, sizeof(raft_entry_data_t));
+
     rep.leader_term       = me->current_term;
     rep.leader_commit_idx = me->commit_idx;  
     send_cnt = 0;

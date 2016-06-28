@@ -794,7 +794,7 @@ int raft_recv_entry(raft_server_t* me_,
          * Don't send the entry to peers who are behind, to prevent them from
          * becoming congested. */
         int next_idx = raft_node_get_next_idx(me->nodes[i]);
-        if (next_idx == raft_get_current_idx(me_))
+        if (next_idx == raft_get_current_idx(me_) && !me->client_assist)
             raft_send_appendentries(me_, me->nodes[i]);
     }
 
@@ -853,7 +853,7 @@ int raft_recv_entry_batch(raft_server_t* me_,
          * Don't send the entry to peers who are behind, to prevent them from
          * becoming congested. */
         int next_idx = raft_node_get_next_idx(me->nodes[i]);
-        if (next_idx == next_curr_idx)
+        if (next_idx == next_curr_idx && !me->client_assist)
             raft_send_appendentries(me_, me->nodes[i]);
     }
 

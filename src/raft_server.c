@@ -327,7 +327,8 @@ int raft_recv_appendentries_response(raft_server_t* me_,
 
     assert(r->current_idx <= raft_get_current_idx(me_));
 
-    raft_node_set_next_idx(node, r->current_idx + 1);
+    // For a positive ack do not roll back next idx
+    raft_node_set_next_idx(node, max(r->current_idx + 1, raft_node_get_next_idx(node)));
     raft_node_set_match_idx(node, r->current_idx);
 
     if (!raft_node_is_voting(node) &&

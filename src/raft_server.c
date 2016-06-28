@@ -999,7 +999,7 @@ int raft_send_appendentries(raft_server_t* me_, raft_node_t* node)
     return 0;
 }
 
-int raft_send_appendentries_tail(raft_server_t* me_, int next_idx, raft_node_t* node)
+int raft_send_log_tail(raft_server_t* me_, int next_idx, raft_node_t* node)
 {
     raft_server_private_t* me = (raft_server_private_t*)me_;
 

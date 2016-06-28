@@ -396,8 +396,11 @@ void raft_recv_assisted_quorum(raft_server_t *me_,
   }
 }
 
+static int in_apply_log_cache = 0;
 static void apply_log_cache(raft_server_t *me_)
 {
+  if(in_apply_log_cache) return; // No recursion
+  in_apply_log_cache = 1;
   raft_server_private_t* me = (raft_server_private_t*)me_;
   int prev_idx = 0, prev_term = 0;
   int ety_index = raft_get_current_idx(me_);
@@ -443,6 +446,7 @@ static void apply_log_cache(raft_server_t *me_)
       }
     }
   }
+  in_apply_log_cache = 0;
 }
 
 int raft_recv_appendentries(
@@ -766,7 +770,7 @@ int raft_recv_entry(raft_server_t* me_,
     raft_server_private_t* me = (raft_server_private_t*)me_;
     int i;
     replicant_t rep;
-
+    
     /* Only one voting cfg change at a time */
     if (raft_entry_is_voting_cfg_change(e))
         if (-1 != me->voting_cfg_change_log_idx)
@@ -786,23 +790,23 @@ int raft_recv_entry(raft_server_t* me_,
 
     rep.leader_term       = me->current_term;
     rep.leader_commit_idx = me->commit_idx;  
-
-    if(me->client_assist) {
-      raft_append_entry(me_, &ety, &rep);
-    }
-    else {
-      raft_append_entry(me_, &ety, NULL);
-    }
-
+    
+    raft_append_entry(me_, &ety, me->client_assist ? &rep : NULL);
+    
     if(!me->client_assist) {
-      for (i = 0; i < me->num_nodes; i++)
-	{
-	  if (me->node == me->nodes[i] || !me->nodes[i] ||
-	      !raft_node_is_voting(me->nodes[i]))
-            continue;
-	  raft_send_log_tail(me_, raft_get_current_idx(me_), me->nodes[i]);
+      for (i = 0; i < me->num_nodes; i++) {
+	if (me->node == me->nodes[i] || 
+	    !me->nodes[i] ||
+	    !raft_node_is_voting(me->nodes[i]))
+	    continue;
+	// Aggressively send appendentries if we think node is up to date
+	if(raft_node_get_next_idx(me->nodes[i]) == raft_get_current_idx(me_)) {
+	  raft_send_appendentries(me_, me->nodes[i]);
+	  raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_));
 	}
+      }
     }
+
 
     /* if we're the only node, we can consider the entry committed */
     if (1 == me->num_nodes)
@@ -840,20 +844,19 @@ int raft_recv_entry_batch(raft_server_t* me_,
     rep.leader_term       = me->current_term;
     rep.leader_commit_idx = me->commit_idx;
  
-    if(me->client_assist) {
-      raft_append_entry_batch(me_, e, count, &rep);
-    }
-    else {
-      raft_append_entry_batch(me_, e, count, NULL);
-    }
-
+    int prev_log_pos = raft_get_current_idx(me_);
+    raft_append_entry_batch(me_, e, count, me->client_assist ? &rep : NULL);
+    
     if(!me->client_assist) {
-      for (i = 0; i < me->num_nodes; i++)
-      {
-        if (me->node == me->nodes[i] || !me->nodes[i] ||
+      for (i = 0; i < me->num_nodes; i++) {
+        if (me->node == me->nodes[i] || 
+	    !me->nodes[i] ||
             !raft_node_is_voting(me->nodes[i]))
 	  continue;
-	raft_send_log_tail(me_, raft_get_current_idx(me_) - count, me->nodes[i]);
+	if(raft_node_get_next_idx(me->nodes[i]) == prev_log_pos) {
+	  raft_send_appendentries(me_, me->nodes[i]);
+	  raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_));
+	}
       }
     }
     
@@ -991,48 +994,6 @@ int raft_send_appendentries(raft_server_t* me_, raft_node_t* node)
     return 0;
 }
 
-int raft_send_log_tail(raft_server_t* me_, int next_idx, raft_node_t* node)
-{
-    raft_server_private_t* me = (raft_server_private_t*)me_;
-
-    assert(node);
-    assert(node != me->node);
-
-    if (!(me->cb.send_appendentries))
-        return -1;
-
-    msg_appendentries_t ae = {};
-    ae.term = me->current_term;
-    ae.leader_commit = raft_get_commit_idx(me_);
-    ae.prev_log_idx = 0;
-    ae.prev_log_term = 0;
-
-    ae.entries = raft_get_entries_from_idx(me_, next_idx, &ae.n_entries);
-    /* previous log is the log just before the new logs */
-    if (1 < next_idx)
-    {
-        raft_entry_t* prev_ety = raft_get_entry_from_idx(me_, next_idx - 1);
-	if(prev_ety == NULL) {
-	  // We've already compacted this entry...
-	  ae.prev_log_term = -1;
-	}
-	else {
-	  ae.prev_log_term = prev_ety->term;
-	}
-        ae.prev_log_idx = next_idx - 1;
-    }
-
-    __log(me_, node, "sending appendentries node: ci:%d t:%d lc:%d pli:%d plt:%d",
-          raft_get_current_idx(me_),
-          ae.term,
-          ae.leader_commit,
-          ae.prev_log_idx,
-          ae.prev_log_term);
-
-    me->cb.send_appendentries(me_, me->udata, node, &ae);
-
-    return 0;
-}
 
 void raft_send_appendentries_all(raft_server_t* me_)
 {

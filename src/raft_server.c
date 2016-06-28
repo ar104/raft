@@ -373,7 +373,7 @@ int raft_recv_appendentries_response(raft_server_t* me_,
 
     /* Aggressively send remaining entries */
     if (raft_get_entry_from_idx(me_, raft_node_get_next_idx(node)))
-      if (!raft_is_assisted(me_, raft_node_get_next_idx(node)))
+      if (!raft_is_assisted(me_, raft_node_get_next_idx(node) - 1))
         raft_send_appendentries(me_, node);
 
     if (me->last_applied_idx < me->commit_idx && !raft_get_img_build(me_)) {

@@ -318,6 +318,12 @@ typedef void (
 		  replicant_t *rep
 		  );
 
+typedef void (
+*func_append_resp_f
+	      )(void *user_data,
+		raft_node_t *node,
+		msg_appendentries_response_t *r);
+
 typedef struct
 {
     /** Callback for sending request vote messages */
@@ -329,6 +335,9 @@ typedef struct
     /** Callback to send a positive response to client assist */
     func_client_assist_ok_f client_assist_ok;
 
+    /** Callback to send a positive response to leader */
+    func_append_resp_f send_appendentries_response;
+  
     /** Callback for finite state machine application
      * Return 0 on success.
      * Return RAFT_ERR_SHUTDOWN if you want the server to shutdown. */

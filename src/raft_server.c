@@ -373,7 +373,6 @@ int raft_recv_appendentries_response(raft_server_t* me_,
 
     /* Aggressively send remaining entries */
     if (raft_get_entry_from_idx(me_, raft_node_get_next_idx(node)))
-      if (!raft_is_assisted(me_, raft_node_get_next_idx(node) - 1))
         raft_send_appendentries(me_, node);
 
     if (me->last_applied_idx < me->commit_idx && !raft_get_img_build(me_)) {
@@ -409,43 +408,47 @@ static void apply_log_cache(raft_server_t *me_)
 {
   raft_server_private_t* me = (raft_server_private_t*)me_;
   int prev_idx = 0, prev_term = 0;
-  while(1) {
-    int ety_index = raft_get_current_idx(me_);
-    raft_entry_t* existing_ety = raft_get_entry_from_idx(me_, ety_index);
-    if(existing_ety) {
-      prev_idx  = ety_index;
-      prev_term = existing_ety->term; 
+  int ety_index = raft_get_current_idx(me_);
+  raft_entry_t* existing_ety = raft_get_entry_from_idx(me_, ety_index);
+  if(existing_ety) {
+    prev_idx  = ety_index;
+    prev_term = existing_ety->term; 
+  }
+  replicant_t *c = log_cache_get_next(me->log_cache,
+				      prev_idx,
+				      prev_term);
+  if(c != NULL) {
+    msg_appendentries_t ety;
+    msg_appendentries_response_t dummy;
+    ety.term = me->current_term;
+    ety.prev_log_idx = prev_idx;
+    ety.prev_log_term = prev_term;
+    ety.leader_commit = c->leader_commit_idx;
+    if(ety.leader_commit < me->commit_idx) {
+      ety.leader_commit = me->commit_idx;
     }
-    replicant_t *c = log_cache_get_next(me->log_cache,
-					prev_idx,
-					prev_term);
-    if(c != NULL) {
-      msg_appendentries_t ety;
-      msg_appendentries_response_t dummy;
-      ety.term = me->current_term;
-      ety.prev_log_idx = prev_idx;
-      ety.prev_log_term = prev_term;
-      ety.leader_commit = c->leader_commit_idx;
-      if(ety.leader_commit < me->commit_idx) {
-	ety.leader_commit = me->commit_idx;
-      }
-      ety.n_entries = 1;
-      ety.entries = &c->ety;
-      void *tmp = c->ety.data.buf;
-      raft_recv_appendentries(me_,
-			      me->current_leader,
-			      &ety,
-			      &dummy);
-      free(tmp);
-      /* Entry accepted ? */
-      if(dummy.success == 1) {
+    ety.n_entries = 1;
+    ety.entries = &c->ety;
+    void *tmp = c->ety.data.buf;
+    raft_recv_appendentries(me_,
+			    me->current_leader,
+			    &ety,
+			    &dummy); // Can recursively call us
+    free(tmp);
+    /* Entry accepted ? */
+    if(dummy.success == 1) {
+      if(c->server_id != -1) {
 	if(me->cb.client_assist_ok) {
 	  me->cb.client_assist_ok(me->udata, c);
 	}
       }
-    }
-    else {
-      break;
+      else {
+	if(me->cb.send_appendentries_response) {
+	  me->cb.send_appendentries_response(me->udata,
+					     me->current_leader,
+					     &dummy);
+	}
+      }
     }
   }
 }
@@ -591,6 +594,21 @@ int raft_recv_appendentries(
 
 fail_with_current_idx:
     r->current_idx = raft_get_current_idx(me_);
+    // Also add to log cache
+    replicant_t rep;
+    int prev_idx = ae->prev_log_idx;
+    int prev_term = ae->prev_log_term;
+    rep.leader_term       = ae->term;
+    rep.leader_commit_idx = ae->leader_commit;
+    for(i=0;i<ae->n_entries;i++) {
+      rep.prev_idx = prev_idx;
+      rep.prev_term = prev_term;
+      rep.server_id = -1; // Indicate this is from the leader
+      memcpy(&rep.ety, &ae->entries[i], sizeof(msg_entry_t));
+      raft_recv_assisted_appendentries(me_, &rep);
+      prev_idx++;
+      prev_term = ae->entries[i].term;
+    }
 fail:
     r->success = 0;
     r->first_idx = 0;
@@ -784,18 +802,14 @@ int raft_recv_entry(raft_server_t* me_,
       raft_append_entry(me_, &ety, NULL);
     }
 
-    for (i = 0; i < me->num_nodes; i++)
-    {
-        if (me->node == me->nodes[i] || !me->nodes[i] ||
-            !raft_node_is_voting(me->nodes[i]))
+    if(!me->client_assist) {
+      for (i = 0; i < me->num_nodes; i++)
+	{
+	  if (me->node == me->nodes[i] || !me->nodes[i] ||
+	      !raft_node_is_voting(me->nodes[i]))
             continue;
-
-        /* Only send new entries.
-         * Don't send the entry to peers who are behind, to prevent them from
-         * becoming congested. */
-        int next_idx = raft_node_get_next_idx(me->nodes[i]);
-        if (next_idx == raft_get_current_idx(me_) && !me->client_assist)
-            raft_send_appendentries(me_, me->nodes[i]);
+	  raft_send_log_tail(me_, raft_get_current_idx(me_), me->nodes[i]);
+	}
     }
 
     /* if we're the only node, we can consider the entry committed */
@@ -830,9 +844,7 @@ int raft_recv_entry_batch(raft_server_t* me_,
 	    me->current_term, (e + i)->id, raft_get_current_idx(me_) + i + 1);
       (e + i)->term = me->current_term;
     }
-
-    int next_curr_idx = raft_get_current_idx(me_) + 1;
-
+    
     rep.leader_term       = me->current_term;
     rep.leader_commit_idx = me->commit_idx;
  
@@ -843,20 +855,16 @@ int raft_recv_entry_batch(raft_server_t* me_,
       raft_append_entry_batch(me_, e, count, NULL);
     }
 
-    for (i = 0; i < me->num_nodes; i++)
-    {
+    if(!me->client_assist) {
+      for (i = 0; i < me->num_nodes; i++)
+      {
         if (me->node == me->nodes[i] || !me->nodes[i] ||
             !raft_node_is_voting(me->nodes[i]))
-            continue;
-
-        /* Only send new entries.
-         * Don't send the entry to peers who are behind, to prevent them from
-         * becoming congested. */
-        int next_idx = raft_node_get_next_idx(me->nodes[i]);
-        if (next_idx == next_curr_idx && !me->client_assist)
-            raft_send_appendentries(me_, me->nodes[i]);
+	  continue;
+	raft_send_log_tail(me_, raft_get_current_idx(me_) - count, me->nodes[i]);
+      }
     }
-
+    
     /* if we're the only node, we can consider the entry committed */
     if (1 == me->num_nodes)
         me->commit_idx = raft_get_current_idx(me_);
@@ -963,6 +971,49 @@ int raft_send_appendentries(raft_server_t* me_, raft_node_t* node)
     ae.prev_log_term = 0;
 
     int next_idx = raft_node_get_next_idx(node);
+
+    ae.entries = raft_get_entries_from_idx(me_, next_idx, &ae.n_entries);
+    /* previous log is the log just before the new logs */
+    if (1 < next_idx)
+    {
+        raft_entry_t* prev_ety = raft_get_entry_from_idx(me_, next_idx - 1);
+	if(prev_ety == NULL) {
+	  // We've already compacted this entry...
+	  ae.prev_log_term = -1;
+	}
+	else {
+	  ae.prev_log_term = prev_ety->term;
+	}
+        ae.prev_log_idx = next_idx - 1;
+    }
+
+    __log(me_, node, "sending appendentries node: ci:%d t:%d lc:%d pli:%d plt:%d",
+          raft_get_current_idx(me_),
+          ae.term,
+          ae.leader_commit,
+          ae.prev_log_idx,
+          ae.prev_log_term);
+
+    me->cb.send_appendentries(me_, me->udata, node, &ae);
+
+    return 0;
+}
+
+int raft_send_appendentries_tail(raft_server_t* me_, int next_idx, raft_node_t* node)
+{
+    raft_server_private_t* me = (raft_server_private_t*)me_;
+
+    assert(node);
+    assert(node != me->node);
+
+    if (!(me->cb.send_appendentries))
+        return -1;
+
+    msg_appendentries_t ae = {};
+    ae.term = me->current_term;
+    ae.leader_commit = raft_get_commit_idx(me_);
+    ae.prev_log_idx = 0;
+    ae.prev_log_term = 0;
 
     ae.entries = raft_get_entries_from_idx(me_, next_idx, &ae.n_entries);
     /* previous log is the log just before the new logs */

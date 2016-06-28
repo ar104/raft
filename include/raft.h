@@ -773,4 +773,9 @@ void raft_loaded_checkpoint(raft_server_t *me_,
 /* Get last applied entry */
 raft_entry_t *raft_last_applied_ety(raft_server_t *me_);
 
+
+/* Toggle client assist */
+void raft_set_client_assist(raft_server_t *me_);
+void raft_unset_client_assist(raft_server_t *me_);
+
 #endif /* RAFT_H_ */

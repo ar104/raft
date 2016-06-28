@@ -75,6 +75,9 @@ typedef struct {
     /* Image build in progress */
     volatile int img_build_in_progress;
 
+    /* Flag to toggle client assist */ 
+    volatile int client_assist;
+
 } raft_server_private_t;
 
 void raft_election_start(raft_server_t* me);

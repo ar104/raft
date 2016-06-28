@@ -75,7 +75,20 @@ raft_server_t* raft_new()
     me->last_compacted_idx = me->last_applied_idx;
     me->next_compaction_idx = me->last_applied_idx;
     me->img_build_in_progress = 0;
+    me->client_assist = 0;
     return (raft_server_t*)me;
+}
+
+void raft_set_client_assist(raft_server_t *me_)
+{
+  raft_server_private_t* me = (raft_server_private_t*)me_;
+  me->client_assist = 1;
+}
+
+void raft_unset_client_assist(raft_server_t *me_)
+{
+  raft_server_private_t* me = (raft_server_private_t*)me_;
+  me->client_assist = 0;
 }
 
 void raft_loaded_checkpoint(raft_server_t *me_,
@@ -781,7 +794,7 @@ int raft_recv_entry(raft_server_t* me_,
 	  send_cnt++;
     }
     
-    if(send_cnt <= (me->num_nodes/2)) {
+    if(me->client_assist && send_cnt <= (me->num_nodes/2)) {
       raft_append_entry(me_, &ety, &rep);
     }
     else {
@@ -855,7 +868,7 @@ int raft_recv_entry_batch(raft_server_t* me_,
 	  send_cnt++;
     }
     
-    if(send_cnt <= (me->num_nodes/2)) {
+    if(me->client_assist && send_cnt <= (me->num_nodes/2)) {
       raft_append_entry_batch(me_, e, count, &rep);
     }
     else {

@@ -88,8 +88,12 @@ replicant_t* log_cache_get_next(log_cache_t *me,
 void log_cache_add(log_cache_t* me,
 		   replicant_t *rep)
 {
-  me->entries[REL_POS(rep->prev_idx + 1)]  = *rep;
-  me->is_valid[REL_POS(rep->prev_idx + 1)] = 1;
+  int pos = REL_POS(rep->prev_idx + 1);
+  if(me->is_valid[pos]) {
+    free(me->entries[pos].ety.data.buf);
+  }
+  me->entries[pos]  = *rep;
+  me->is_valid[pos] = 1;
 }
 
 int log_cache_contains(log_cache_t *me, int idx)

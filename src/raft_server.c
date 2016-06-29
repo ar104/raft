@@ -792,6 +792,7 @@ int raft_recv_entry(raft_server_t* me_,
     rep.leader_term       = me->current_term;
     rep.leader_commit_idx = me->commit_idx;  
     
+    int new_idx = raft_get_current_idx(me_) + 1;
     raft_append_entry(me_, &ety, me->client_assist ? &rep : NULL);
     
     if(!me->client_assist) {
@@ -801,7 +802,7 @@ int raft_recv_entry(raft_server_t* me_,
 	    !raft_node_is_voting(me->nodes[i]))
 	    continue;
 	// Aggressively send appendentries if we think node is up to date
-	if(raft_node_get_next_idx(me->nodes[i]) == raft_get_current_idx(me_)) {
+	if(raft_node_get_next_idx(me->nodes[i]) == new_idx) {
 	  raft_send_appendentries(me_, me->nodes[i]);
 	  raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_));
 	}
@@ -845,7 +846,7 @@ int raft_recv_entry_batch(raft_server_t* me_,
     rep.leader_term       = me->current_term;
     rep.leader_commit_idx = me->commit_idx;
  
-    int prev_log_pos = raft_get_current_idx(me_);
+    int new_idx = raft_get_current_idx(me_) + 1;
     raft_append_entry_batch(me_, e, count, me->client_assist ? &rep : NULL);
     
     if(!me->client_assist) {
@@ -854,7 +855,7 @@ int raft_recv_entry_batch(raft_server_t* me_,
 	    !me->nodes[i] ||
             !raft_node_is_voting(me->nodes[i]))
 	  continue;
-	if(raft_node_get_next_idx(me->nodes[i]) == prev_log_pos) {
+	if(raft_node_get_next_idx(me->nodes[i]) == new_idx) {
 	  raft_send_appendentries(me_, me->nodes[i]);
 	  raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_));
 	}

@@ -404,47 +404,52 @@ static void apply_log_cache(raft_server_t *me_)
   in_apply_log_cache = 1;
   raft_server_private_t* me = (raft_server_private_t*)me_;
   int prev_idx = 0, prev_term = 0;
-  int ety_index = raft_get_current_idx(me_);
-  raft_entry_t* existing_ety = raft_get_entry_from_idx(me_, ety_index);
-  if(existing_ety) {
-    prev_idx  = ety_index;
-    prev_term = existing_ety->term; 
-  }
-  replicant_t *c = log_cache_get_next(me->log_cache,
-				      prev_idx,
-				      prev_term);
-  if(c != NULL) {
-    msg_appendentries_t ety;
-    msg_appendentries_response_t dummy;
-    ety.term = me->current_term;
-    ety.prev_log_idx = prev_idx;
-    ety.prev_log_term = prev_term;
-    ety.leader_commit = c->leader_commit_idx;
-    if(ety.leader_commit < me->commit_idx) {
-      ety.leader_commit = me->commit_idx;
+  while(1) {
+    int ety_index = raft_get_current_idx(me_);
+    raft_entry_t* existing_ety = raft_get_entry_from_idx(me_, ety_index);
+    if(existing_ety) {
+      prev_idx  = ety_index;
+      prev_term = existing_ety->term; 
     }
-    ety.n_entries = 1;
-    ety.entries = &c->ety;
-    void *tmp = c->ety.data.buf;
-    raft_recv_appendentries(me_,
-			    me->current_leader,
-			    &ety,
-			    &dummy); // Can recursively call us
-    free(tmp);
-    /* Entry accepted ? */
-    if(dummy.success == 1) {
-      if(c->server_id != -1) {
-	if(me->cb.client_assist_ok) {
-	  me->cb.client_assist_ok(me->udata, c);
+    replicant_t *c = log_cache_get_next(me->log_cache,
+					prev_idx,
+					prev_term);
+    if(c != NULL) {
+      msg_appendentries_t ety;
+      msg_appendentries_response_t dummy;
+      ety.term = me->current_term;
+      ety.prev_log_idx = prev_idx;
+      ety.prev_log_term = prev_term;
+      ety.leader_commit = c->leader_commit_idx;
+      if(ety.leader_commit < me->commit_idx) {
+	ety.leader_commit = me->commit_idx;
+      }
+      ety.n_entries = 1;
+      ety.entries = &c->ety;
+      void *tmp = c->ety.data.buf;
+      raft_recv_appendentries(me_,
+			      me->current_leader,
+			      &ety,
+			      &dummy); // Can recursively call us
+      free(tmp);
+      /* Entry accepted ? */
+      if(dummy.success == 1) {
+	if(c->server_id != -1) {
+	  if(me->cb.client_assist_ok) {
+	    me->cb.client_assist_ok(me->udata, c);
+	  }
+	}
+	else {
+	  if(me->cb.send_appendentries_response) {
+	    me->cb.send_appendentries_response(me->udata,
+					       me->current_leader,
+					       &dummy);
+	  }
 	}
       }
-      else {
-	if(me->cb.send_appendentries_response) {
-	  me->cb.send_appendentries_response(me->udata,
-					     me->current_leader,
-					     &dummy);
-	}
-      }
+    }
+    else {
+      break; // Nothing more to do.
     }
   }
   in_apply_log_cache = 0;

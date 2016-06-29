@@ -426,19 +426,17 @@ static void apply_log_cache(raft_server_t *me_)
 			      &ety,
 			      &dummy); // Can recursively call us
       free(tmp);
-      /* Entry accepted ? */
-      if(dummy.success == 1) {
-	if(c->server_id != -1) {
-	  if(me->cb.client_assist_ok) {
-	    me->cb.client_assist_ok(me->udata, c);
-	  }
+      assert(dummy.success == 1);
+      if(c->server_id != -1) {
+	if(me->cb.client_assist_ok) {
+	  me->cb.client_assist_ok(me->udata, c);
 	}
-	else {
-	  if(me->cb.send_appendentries_response) {
-	    me->cb.send_appendentries_response(me->udata,
-					       me->current_leader,
-					       &dummy);
-	  }
+      }
+      else {
+	if(me->cb.send_appendentries_response) {
+	  me->cb.send_appendentries_response(me->udata,
+					     me->current_leader,
+					     &dummy);
 	}
       }
     }

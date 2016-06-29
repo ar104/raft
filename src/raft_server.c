@@ -311,16 +311,10 @@ int raft_recv_appendentries_response(raft_server_t* me_,
     {
         /* If AppendEntries fails because of log inconsistency:
            decrement nextIndex and retry (§5.3) */
-        assert(0 <= raft_node_get_next_idx(node));
-
-        int next_idx = raft_node_get_next_idx(node);
-        assert(0 <= next_idx);
-        if (r->current_idx < next_idx - 1)
-            raft_node_set_next_idx(node, min(r->current_idx + 1, raft_get_current_idx(me_)));
-        else
-            raft_node_set_next_idx(node, next_idx - 1);
-
-        /* retry */
+        /* We use the provided current index */
+        raft_node_set_next_idx(node, min(r->current_idx + 1, raft_get_current_idx(me_)));
+        assert(raft_node_get_next_idx(node) <= (raft_node_get_match_idx(node) + 1));
+	/* retry */
         raft_send_appendentries(me_, node);
         return 0;
     }
@@ -809,7 +803,7 @@ int raft_recv_entry(raft_server_t* me_,
 	// Aggressively send appendentries if we think node is up to date
 	if(raft_node_get_next_idx(me->nodes[i]) == new_idx) {
 	  raft_send_appendentries(me_, me->nodes[i]);
-	  raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_));
+	  raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_) + 1);
 	}
       }
     }
@@ -862,7 +856,7 @@ int raft_recv_entry_batch(raft_server_t* me_,
 	  continue;
 	if(raft_node_get_next_idx(me->nodes[i]) == new_idx) {
 	  raft_send_appendentries(me_, me->nodes[i]);
-	  raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_));
+	  raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_) + 1);
 	}
       }
     }

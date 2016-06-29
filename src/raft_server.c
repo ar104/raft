@@ -313,7 +313,7 @@ int raft_recv_appendentries_response(raft_server_t* me_,
            decrement nextIndex and retry (§5.3) */
         /* We use the provided current index */
         raft_node_set_next_idx(node, min(r->current_idx + 1, raft_get_current_idx(me_)));
-        assert(raft_node_get_next_idx(node) <= (raft_node_get_match_idx(node) + 1));
+        assert(raft_node_get_match_idx(node) < raft_node_get_next_idx(node));
 	/* retry */
         raft_send_appendentries(me_, node);
         return 0;

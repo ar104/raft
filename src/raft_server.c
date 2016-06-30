@@ -29,6 +29,22 @@
 #define max(a, b) ((a) < (b) ? (b) : (a))
 #endif
 
+static int resp_term    = 0;
+static int resp_idx     = 0;
+static int resp_timeout = 0;
+
+void suppress_resp(msg_appendentries_response_t *r)
+{
+  if(r->term == resp_term && r->current_idx == resp_idx) {
+    r->current_idx = 0;
+  }
+  else {
+    resp_term    = r->term;
+    resp_idx     = r->current_idx;
+    resp_timeout = 0;
+  }
+}
+
 static void __log(raft_server_t *me_, raft_node_t* node, const char *fmt, ...)
 {
     raft_server_private_t* me = (raft_server_private_t*)me_;
@@ -221,6 +237,13 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
 
     me->timeout_elapsed += msec_since_last_period;
     me->last_compaction += msec_since_last_period;
+    resp_timeout        += msec_since_last_period;
+
+    if(me->request_timeout <= resp_timeout) {
+      resp_term    = 0;
+      resp_idx     = 0;
+      resp_timeout = 0;
+    }
 
     /* Only one voting node means it's safe for us to become the leader */
     if (1 == raft_get_num_voting_nodes(me_) &&
@@ -584,7 +607,7 @@ int raft_recv_appendentries(
 		       me->current_term, 
 		       raft_get_current_idx(me_) + 1);
     apply_log_cache(me_);
-    
+    suppress_resp(r);
     return 0;
 
 fail_with_current_idx:
@@ -607,6 +630,7 @@ fail_with_current_idx:
 fail:
     r->success = 0;
     r->first_idx = 0;
+    suppress_resp(r);
     return -1;
 }
 
@@ -802,7 +826,7 @@ int raft_recv_entry(raft_server_t* me_,
 	// Aggressively send appendentries if we think node is up to date
 	if(raft_node_get_next_idx(me->nodes[i]) == new_idx) {
 	  raft_send_appendentries(me_, me->nodes[i]);
-	  raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_) + 1);
+	  //raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_) + 1);
 	}
       }
     }
@@ -855,7 +879,7 @@ int raft_recv_entry_batch(raft_server_t* me_,
 	  continue;
 	if(raft_node_get_next_idx(me->nodes[i]) == new_idx) {
 	  raft_send_appendentries(me_, me->nodes[i]);
-	  raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_) + 1);
+	  //raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_) + 1);
 	}
       }
     }

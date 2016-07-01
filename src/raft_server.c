@@ -82,6 +82,7 @@ raft_server_t* raft_new()
     me->timeout_elapsed = 0;
     me->last_compaction = 0;
     me->request_timeout = 200;
+    me->nack_timeout    = 200;
     me->election_timeout = 1000;
     me->log = log_new();
     me->log_cache = log_cache_new();
@@ -239,7 +240,7 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
     me->last_compaction += msec_since_last_period;
     resp_timeout        += msec_since_last_period;
 
-    if(me->request_timeout <= resp_timeout) {
+    if(me->nack_timeout <= resp_timeout) {
       resp_term    = 0;
       resp_idx     = 0;
       resp_timeout = 0;

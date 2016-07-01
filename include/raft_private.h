@@ -57,6 +57,7 @@ typedef struct {
 
     int election_timeout;
     int request_timeout;
+    int nack_timeout;
 
     /* what this node thinks is the node ID of the current leader, or -1 if
      * there isn't a known current leader. */

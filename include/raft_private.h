@@ -79,6 +79,9 @@ typedef struct {
     /* Flag to toggle client assist */ 
     volatile int client_assist;
 
+    /* Flag to turn on multiple inflight requests */
+    volatile int multi_inflight;
+
 } raft_server_private_t;
 
 void raft_election_start(raft_server_t* me);

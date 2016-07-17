@@ -93,6 +93,7 @@ raft_server_t* raft_new()
     me->next_compaction_idx = me->last_applied_idx;
     me->img_build_in_progress = 0;
     me->client_assist = 0;
+    me->multi_inflight = 0;
     return (raft_server_t*)me;
 }
 
@@ -106,6 +107,18 @@ void raft_unset_client_assist(raft_server_t *me_)
 {
   raft_server_private_t* me = (raft_server_private_t*)me_;
   me->client_assist = 0;
+}
+
+void raft_set_multi_inflight(raft_server_t *me_)
+{
+  raft_server_private_t* me = (raft_server_private_t*)me_;
+  me->multi_inflight = 1;
+}
+
+void raft_unset_multi_inflight(raft_server_t *me_)
+{
+  raft_server_private_t* me = (raft_server_private_t*)me_;
+  me->multi_inflight = 0;
 }
 
 void raft_loaded_checkpoint(raft_server_t *me_,
@@ -235,6 +248,7 @@ void raft_become_follower(raft_server_t* me_)
 int raft_periodic(raft_server_t* me_, int msec_since_last_period)
 {
     raft_server_private_t* me = (raft_server_private_t*)me_;
+    int i;
 
     me->timeout_elapsed += msec_since_last_period;
     me->last_compaction += msec_since_last_period;
@@ -254,8 +268,17 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
 
     if (me->state == RAFT_STATE_LEADER)
     {
-        if (me->request_timeout <= me->timeout_elapsed)
-            raft_send_appendentries_all(me_);
+      me->timeout_elapsed = 0;
+      for (i = 0; i < me->num_nodes; i++)
+        if (me->node != me->nodes[i]) {
+	  raft_node_set_elapsed(me->nodes[i],
+				raft_node_get_elapsed(me->nodes[i]) +
+				msec_since_last_period);
+	  if(raft_node_get_elapsed(me->nodes[i]) >= me->request_timeout) {
+	    raft_send_appendentries(me_, me->nodes[i]);
+	  }
+	}
+      
     }
     // Dont become the leader if building images or bad things will happen
     // when we get a client request
@@ -827,7 +850,8 @@ int raft_recv_entry(raft_server_t* me_,
 	// Aggressively send appendentries if we think node is up to date
 	if(raft_node_get_next_idx(me->nodes[i]) == new_idx) {
 	  raft_send_appendentries(me_, me->nodes[i]);
-	  //raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_) + 1);
+	  if(me->multi_inflight)
+	    raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_) + 1);
 	}
       }
     }
@@ -1015,6 +1039,7 @@ int raft_send_appendentries(raft_server_t* me_, raft_node_t* node)
           ae.prev_log_term);
 
     me->cb.send_appendentries(me_, me->udata, node, &ae);
+    raft_node_set_elapsed(node, 0);
 
     return 0;
 }

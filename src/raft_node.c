@@ -27,8 +27,10 @@ typedef struct
     int next_idx;
     int match_idx;
 
-    int flags;
+    int timeout_elapsed;
 
+    int flags;
+     
     int id;
 } raft_node_private_t;
 
@@ -43,6 +45,7 @@ raft_node_t* raft_node_new(void* udata, int id)
     me->match_idx = 0;
     me->id = id;
     me->flags = RAFT_NODE_VOTING;
+    me->timeout_elapsed = 0;
     return (raft_node_t*)me;
 }
 
@@ -57,6 +60,18 @@ void raft_node_set_next_idx(raft_node_t* me_, int nextIdx)
     raft_node_private_t* me = (raft_node_private_t*)me_;
     /* log index begins at 1 */
     me->next_idx = nextIdx < 1 ? 1 : nextIdx;
+}
+
+int raft_node_get_elapsed(raft_node_t *me_)
+{
+  raft_node_private_t* me = (raft_node_private_t*)me_;
+  return me->timeout_elapsed;
+}
+
+void raft_node_set_elapsed(raft_node_t *me_, int elapsed)
+{
+  raft_node_private_t* me = (raft_node_private_t*)me_;
+  me->timeout_elapsed = elapsed;
 }
 
 int raft_node_get_match_idx(raft_node_t* me_)

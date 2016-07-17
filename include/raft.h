@@ -629,6 +629,9 @@ int raft_node_get_next_idx(raft_node_t* node);
  * @return this node's user data */
 int raft_node_get_match_idx(raft_node_t* me);
 
+int raft_node_get_elapsed(raft_node_t *me);
+void raft_node_set_elapsed(raft_node_t *me, int elapsed);
+
 /**
  * @return this node's user data */
 void* raft_node_get_udata(raft_node_t* me);
@@ -792,5 +795,9 @@ raft_entry_t *raft_last_applied_ety(raft_server_t *me_);
 /* Toggle client assist */
 void raft_set_client_assist(raft_server_t *me_);
 void raft_unset_client_assist(raft_server_t *me_);
+
+/* Toggle multi-inflight  */
+void raft_set_multi_inflight(raft_server_t *me_);
+void raft_unset_multi_inflight(raft_server_t *me_);
 
 #endif /* RAFT_H_ */

@@ -904,7 +904,8 @@ int raft_recv_entry_batch(raft_server_t* me_,
 	  continue;
 	if(raft_node_get_next_idx(me->nodes[i]) == new_idx) {
 	  raft_send_appendentries(me_, me->nodes[i]);
-	  //raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_) + 1);
+	  if(me->multi_inflight)
+	    raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_) + 1);
 	}
       }
     }

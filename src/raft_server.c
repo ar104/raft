@@ -849,9 +849,9 @@ int raft_recv_entry(raft_server_t* me_,
 	    continue;
 	// Aggressively send appendentries if we think node is up to date
 	if(raft_node_get_next_idx(me->nodes[i]) == new_idx) {
-	  raft_send_appendentries(me_, me->nodes[i]);
+	  int s = raft_send_appendentries(me_, me->nodes[i]);
 	  if(me->multi_inflight)
-	    raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_) + 1);
+	    raft_node_set_next_idx(me->nodes[i], new_idx + s);
 	}
       }
     }
@@ -903,9 +903,9 @@ int raft_recv_entry_batch(raft_server_t* me_,
             !raft_node_is_voting(me->nodes[i]))
 	  continue;
 	if(raft_node_get_next_idx(me->nodes[i]) == new_idx) {
-	  raft_send_appendentries(me_, me->nodes[i]);
+	  int s = raft_send_appendentries(me_, me->nodes[i]);
 	  if(me->multi_inflight)
-	    raft_node_set_next_idx(me->nodes[i], raft_get_current_idx(me_) + 1);
+	    raft_node_set_next_idx(me->nodes[i], new_idx + s);
 	}
       }
     }
@@ -1007,7 +1007,7 @@ int raft_send_appendentries(raft_server_t* me_, raft_node_t* node)
     assert(node != me->node);
 
     if (!(me->cb.send_appendentries))
-        return -1;
+        return 0;
 
     msg_appendentries_t ae = {};
     ae.term = me->current_term;
@@ -1039,10 +1039,10 @@ int raft_send_appendentries(raft_server_t* me_, raft_node_t* node)
           ae.prev_log_idx,
           ae.prev_log_term);
 
-    me->cb.send_appendentries(me_, me->udata, node, &ae);
+    int sent = me->cb.send_appendentries(me_, me->udata, node, &ae);
     raft_node_set_elapsed(node, 0);
 
-    return 0;
+    return sent;
 }
 
 

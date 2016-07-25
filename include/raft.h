@@ -43,8 +43,10 @@ typedef struct
     unsigned int term;
 
     /** the entry's unique ID */
+  union {
     unsigned int id;
-
+    void *wal;
+  };
     /** type of entry */
     int type;
 
@@ -73,10 +75,7 @@ typedef raft_entry_t msg_entry_t;
 typedef struct
 {
     /** the entry's unique ID */
-  union {
     unsigned int id;
-    void *wal;
-  };
     /** the entry's term */
     int term;
 

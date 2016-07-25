@@ -43,10 +43,9 @@ typedef struct
     unsigned int term;
 
     /** the entry's unique ID */
-  union {
     unsigned int id;
     void *wal;
-  };
+
     /** type of entry */
     int type;
 

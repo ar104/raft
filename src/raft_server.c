@@ -860,11 +860,11 @@ int raft_recv_entry(raft_server_t* me_,
     /* if we're the only node, we can consider the entry committed */
     if (1 == me->num_nodes)
         me->commit_idx = raft_get_current_idx(me_);
-
-    r->id = e->id;
-    r->idx = raft_get_current_idx(me_);
-    r->term = me->current_term;
-
+    if(r != NULL) {
+      r->id = e->id;
+      r->idx = raft_get_current_idx(me_);
+      r->term = me->current_term;
+    }
     if (raft_entry_is_voting_cfg_change(e))
         me->voting_cfg_change_log_idx = raft_get_current_idx(me_);
 
@@ -913,12 +913,13 @@ int raft_recv_entry_batch(raft_server_t* me_,
     /* if we're the only node, we can consider the entry committed */
     if (1 == me->num_nodes)
         me->commit_idx = raft_get_current_idx(me_);
-
-    for(i=0;i<count;i++,r++) {
-      r->id = e->id;
-      r->idx = raft_get_current_idx(me_);
-      r->term = me->current_term;
-    } 
+    if(r != NULL) {
+      for(i=0;i<count;i++,r++) {
+	r->id = e->id;
+	r->idx = raft_get_current_idx(me_);
+	r->term = me->current_term;
+      } 
+    }
     if (raft_entry_is_voting_cfg_change(e))
         me->voting_cfg_change_log_idx = raft_get_current_idx(me_);
 

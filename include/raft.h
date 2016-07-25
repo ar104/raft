@@ -73,8 +73,10 @@ typedef raft_entry_t msg_entry_t;
 typedef struct
 {
     /** the entry's unique ID */
+  union {
     unsigned int id;
-
+    void *wal;
+  };
     /** the entry's term */
     int term;
 

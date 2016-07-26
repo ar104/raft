@@ -83,6 +83,7 @@ raft_server_t* raft_new()
     me->last_compaction = 0;
     me->request_timeout = 200;
     me->nack_timeout    = 200;
+    me->log_target      = 10000;
     me->election_timeout = 1000;
     me->log = log_new();
     me->log_cache = log_cache_new();
@@ -301,8 +302,8 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
 	  break;
 	me->last_compacted_idx++;
       }
-      if(me->last_applied_idx > 10000) {
-	me->next_compaction_idx = me->last_applied_idx - 10000;
+      if(me->last_applied_idx > me->log_target) {
+	me->next_compaction_idx = me->last_applied_idx - me->log_target;
       }
       me->last_compaction = 0;
     }

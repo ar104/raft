@@ -37,6 +37,12 @@ void raft_set_nack_timeout(raft_server_t* me_, int millisec)
     me->nack_timeout = millisec;
 }
 
+void raft_set_log_target(raft_server_t* me_, int target)
+{
+    raft_server_private_t* me = (raft_server_private_t*)me_;
+    me->log_target = target;
+}
+
 int raft_get_nodeid(raft_server_t* me_)
 {
     raft_server_private_t* me = (raft_server_private_t*)me_;

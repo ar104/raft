@@ -297,7 +297,8 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
 
     if(me->election_timeout <= me->last_compaction) {
       while(me->last_compacted_idx < me->next_compaction_idx) {
-	(void)log_poll(me->log);
+	if(log_poll(me->log))
+	  break;
 	me->last_compacted_idx++;
       }
       if(me->last_applied_idx > 10000) {

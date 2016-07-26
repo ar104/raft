@@ -44,7 +44,7 @@ typedef struct
 
     /** the entry's unique ID */
     unsigned int id;
-    void *wal;
+    void *pkt;
 
     /** type of entry */
     int type;

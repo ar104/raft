@@ -296,7 +296,7 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
       }
     }
 
-    if(me->election_timeout <= me->last_compaction) {
+    //if(me->election_timeout <= me->last_compaction) {
       while(me->last_compacted_idx < me->next_compaction_idx) {
 	if(log_poll(me->log))
 	  break;
@@ -306,7 +306,7 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
 	me->next_compaction_idx = me->last_applied_idx - me->log_target;
       }
       me->last_compaction = 0;
-    }
+      //}
     
     return 0;
 }

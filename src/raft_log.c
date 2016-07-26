@@ -279,24 +279,25 @@ void log_delete(log_t* me_, int idx)
     }
 }
 
-void *log_poll(log_t * me_)
+int log_poll(log_t * me_)
 {
     log_private_t* me = (log_private_t*)me_;
+    int e = 0;
 
     if (0 == log_count(me_))
-        return NULL;
+        return 0;
 
     void *elem = &me->entries[REL_POS(me->front, me->size)];
 
     if (me->cb && me->cb->log_poll)
-        me->cb->log_poll(me->raft, 
-			 raft_get_udata(me->raft),
-			 elem,
-    			 me->front);
+      e = me->cb->log_poll(me->raft, 
+			   raft_get_udata(me->raft),
+			   elem,
+			   me->front);
 
     me->front++;
     me->count--;
-    return elem;
+    return e;
 }
 
 raft_entry_t *log_peektail(log_t * me_)

@@ -608,6 +608,13 @@ int raft_recv_appendentries(
 			      ae->n_entries - i,
 			      NULL);
     }
+
+    /* Release resources for remaining entries */
+    if(i > 0) {
+      if(me->cb.log_poll) {
+	me->cb.log_poll(NULL, NULL, &ae->entries[i], -1);
+      }
+    }
     
     for (; i < ae->n_entries; i++)
     {

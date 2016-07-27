@@ -584,7 +584,7 @@ int raft_recv_appendentries(
 
     r->current_idx = ae->prev_log_idx;
 
-    int i;
+    int i, xxx;
     for (i = 0; i < ae->n_entries; i++)
     {
         msg_entry_t* ety = &ae->entries[i];
@@ -611,8 +611,10 @@ int raft_recv_appendentries(
 
     /* Release resources for remaining entries */
     if(i > 0) {
-      if(me->cb.log_poll) {
-	me->cb.log_poll(NULL, NULL, &ae->entries[i], -1);
+      for(xxx=0;xxx < i; xxx++) {
+	if(me->cb.log_poll) {
+	  me->cb.log_poll(NULL, NULL, &ae->entries[xxx], -1);
+	}
       }
     }
     

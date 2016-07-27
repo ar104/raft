@@ -297,6 +297,7 @@ typedef int (
     raft_server_t* raft,
     void *user_data,
     raft_entry_t *entry,
+    raft_entry_t *prev,
     int entry_idx,
     replicant_t *rep
     );
@@ -307,6 +308,7 @@ typedef int (
     raft_server_t* raft,
     void *user_data,
     raft_entry_t *entry,
+    raft_entry_t *prev,
     int entry_idx,
     int count,
     replicant_t *rep

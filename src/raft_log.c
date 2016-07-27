@@ -136,6 +136,7 @@ int log_append_entry(log_t* me_, raft_entry_t* c, replicant_t *rep)
 {
     log_private_t* me = (log_private_t*)me_;
     int retval = 0;
+    raft_entry_t *prev;
 
     __ensurecapacity(me);
 
@@ -150,12 +151,21 @@ int log_append_entry(log_t* me_, raft_entry_t* c, replicant_t *rep)
       }
     }
     
-    if (me->cb && me->cb->log_offer)
+    if (me->cb && me->cb->log_offer) {
+      if(me->back > 0) {
+	prev = &me->entries[REL_POS(me->back - 1, me->size)];
+      }
+      else {
+	prev = NULL;
+      }
+      
       retval = me->cb->log_offer(me->raft,
 				 raft_get_udata(me->raft),
 				 c,
+				 prev,
 				 me->back,
 				 rep);
+    }
 
     memcpy(&me->entries[REL_POS(me->back, me->size)], c, sizeof(raft_entry_t));
     me->count++;
@@ -167,6 +177,7 @@ int log_append_batch(log_t* me_, raft_entry_t* c, int count, replicant_t *rep)
 {
     log_private_t* me = (log_private_t*)me_;
     int retval = 0;
+    raft_entry_t *prev;
         
     __ensurecapacity_batch(me, count);
 
@@ -181,12 +192,19 @@ int log_append_batch(log_t* me_, raft_entry_t* c, int count, replicant_t *rep)
       }
     }
     
-    if (me->cb && me->cb->log_offer_batch)
-        retval = me->cb->log_offer_batch(me->raft,
-					 raft_get_udata(me->raft), c,
-					 me->back,
-					 count,
-					 rep);
+    if (me->cb && me->cb->log_offer_batch) {
+      if(me->back > 0) {
+	prev = &me->entries[REL_POS(me->back - 1, me->size)];
+      }
+      else {
+	prev = NULL;
+      }
+      retval = me->cb->log_offer_batch(me->raft,
+				       raft_get_udata(me->raft), c, prev,
+				       me->back,
+				       count,
+				       rep);
+    }
 
     if(REL_POS(me->back + count - 1, me->size) >= REL_POS(me->back, me->size)) {
       memcpy(&me->entries[REL_POS(me->back, me->size)], c, count*sizeof(raft_entry_t));

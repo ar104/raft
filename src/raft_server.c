@@ -853,18 +853,23 @@ int raft_recv_entry(raft_server_t* me_,
     raft_append_entry(me_, &ety, me->client_assist ? &rep : NULL);
     
     if(!me->client_assist) {
-      for (i = 0; i < me->num_nodes; i++) {
+      int start = rand()%me->num_nodes;
+      i = start;
+      do {
 	if (me->node == me->nodes[i] || 
 	    !me->nodes[i] ||
-	    !raft_node_is_voting(me->nodes[i]))
-	    continue;
+	    !raft_node_is_voting(me->nodes[i])) {
+	  i = (i + 1)%me->num_nodes;
+	  continue;
+	}
 	// Aggressively send appendentries if we think node is up to date
 	if(raft_node_get_next_idx(me->nodes[i]) == new_idx) {
 	  int s = raft_send_appendentries(me_, me->nodes[i]);
 	  if(me->multi_inflight)
 	    raft_node_set_next_idx(me->nodes[i], new_idx + s);
 	}
-      }
+	i = (i + 1)%me->num_nodes;
+      } while(i != start);
     }
 
 
@@ -908,17 +913,22 @@ int raft_recv_entry_batch(raft_server_t* me_,
     raft_append_entry_batch(me_, e, count, me->client_assist ? &rep : NULL);
     
     if(!me->client_assist) {
-      for (i = 0; i < me->num_nodes; i++) {
-        if (me->node == me->nodes[i] || 
+      int start = rand()%me->num_nodes;
+      i = start;
+      do {
+	if (me->node == me->nodes[i] || 
 	    !me->nodes[i] ||
-            !raft_node_is_voting(me->nodes[i]))
+            !raft_node_is_voting(me->nodes[i])) {
+	  i = (i + 1)%me->num_nodes;
 	  continue;
+	}
 	if(raft_node_get_next_idx(me->nodes[i]) == new_idx) {
 	  int s = raft_send_appendentries(me_, me->nodes[i]);
 	  if(me->multi_inflight)
 	    raft_node_set_next_idx(me->nodes[i], new_idx + s);
 	}
-      }
+	i = (i + 1)%me->num_nodes;
+      } while(i != start);
     }
     
     /* if we're the only node, we can consider the entry committed */

@@ -1062,7 +1062,14 @@ int raft_send_appendentries(raft_server_t* me_, raft_node_t* node)
           ae.prev_log_term);
 
     int sent = me->cb.send_appendentries(me_, me->udata, node, &ae);
-    raft_node_set_elapsed(node, 0);
+    if(me->multi_inflight) {
+      raft_node_set_next_idx(node, raft_node_get_next_idx(node) + sent);
+      if(!sent)
+	raft_node_set_elapsed(node, 0);
+    }
+    else {
+      raft_node_set_elapsed(node, 0);
+    }
 
     return sent;
 }

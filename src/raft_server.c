@@ -324,13 +324,14 @@ int raft_recv_appendentries_response(raft_server_t* me_,
 {
     raft_server_private_t* me = (raft_server_private_t*)me_;
 
+    /*
     __log(me_, node,
           "received appendentries response %s ci:%d rci:%d 1stidx:%d",
           r->success == 1 ? "SUCCESS" : "fail",
           raft_get_current_idx(me_),
           r->current_idx,
           r->first_idx);
-
+    */
     if (!node)
         return -1;
 
@@ -507,7 +508,7 @@ int raft_recv_appendentries(
     raft_server_private_t* me = (raft_server_private_t*)me_;
 
     me->timeout_elapsed = 0;
-
+    /*
     if (0 < ae->n_entries)
         __log(me_, node, "recvd appendentries from: %lx, t:%d ci:%d lc:%d pli:%d plt:%d #%d",
               node,
@@ -517,7 +518,7 @@ int raft_recv_appendentries(
               ae->prev_log_idx,
               ae->prev_log_term,
               ae->n_entries);
-
+    */
     if(ae->prev_log_term == -1) {
       fprintf(stderr, "Node log is too far behind ... shutting down.\n");
       fflush(stderr);
@@ -901,8 +902,8 @@ int raft_recv_entry_batch(raft_server_t* me_,
         return RAFT_ERR_NOT_LEADER;
 
     for(i=0;i<count;i++) {
-      __log(me_, NULL, "received entry t:%d id: %d idx: %d",
-	    me->current_term, (e + i)->id, raft_get_current_idx(me_) + i + 1);
+      //__log(me_, NULL, "received entry t:%d id: %d idx: %d",
+      //	    me->current_term, (e + i)->id, raft_get_current_idx(me_) + i + 1);
       (e + i)->term = me->current_term;
     }
     

@@ -365,6 +365,7 @@ typedef struct
      * @note If memory was malloc'd in log_offer then this should be the right
      *  time to free the memory. */
     func_logentry_event_f log_poll;
+    func_logentry_event_batch_f log_poll_batch;
 
     /** Callback for removing the youngest entry from the log
      * For safety reasons this callback MUST flush the change to disk.

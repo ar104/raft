@@ -300,18 +300,15 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
       }
     }
 
-    //if(me->election_timeout <= me->last_compaction) {
-      while(me->last_compacted_idx < me->next_compaction_idx) {
-	if(log_poll(me->log))
-	  break;
-	me->last_compacted_idx++;
-      }
-      if(me->last_applied_idx > me->log_target) {
-	me->next_compaction_idx = me->last_applied_idx - me->log_target;
-      }
-      me->last_compaction = 0;
-      //}
-    
+    if(me->last_compacted_idx < me->next_compaction_idx) {
+      log_poll_batch(me->log, me->next_compaction_idx - me->last_compacted_idx);
+      me->last_compacted_idx = me->next_compaction_idx;
+    }
+    if(me->last_applied_idx > me->log_target) {
+      me->next_compaction_idx = me->last_applied_idx - me->log_target;
+    }
+    me->last_compaction = 0;
+        
     return 0;
 }
 

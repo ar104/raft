@@ -297,6 +297,38 @@ void log_delete(log_t* me_, int idx)
     }
 }
 
+void log_poll_batch(log_t *me_, int cnt)
+{
+  log_private_t* me = (log_private_t*)me_;
+  if(cnt > log_count(me_))
+    cnt = log_count(me_);
+  
+  if (me->cb && me->cb->log_poll_batch) {
+    if(REL_POS(me->front + cnt - 1, me->size) >= REL_POS(me->front, me->size)) {
+      me->cb->log_poll_batch(me->raft, 
+			     raft_get_udata(me->raft),
+			     &me->entries[REL_POS(me->front, me->size)],
+			     me->front,
+			     cnt);
+    }
+    else {
+      int part1 = me->size - REL_POS(me->front, me->size);
+      me->cb->log_poll_batch(me->raft, 
+			     raft_get_udata(me->raft),
+			     &me->entries[REL_POS(me->front, me->size)],
+			     me->front,
+			     part1);
+      me->cb->log_poll_batch(me->raft, 
+			     raft_get_udata(me->raft),
+			     &me->entries[0],
+			     me->front + part1,
+			     cnt - part1);
+    }
+  }
+  me->front += cnt;
+  me->count -= cnt;
+}
+
 int log_poll(log_t * me_)
 {
     log_private_t* me = (log_private_t*)me_;

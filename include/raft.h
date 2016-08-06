@@ -52,18 +52,6 @@ typedef struct
     raft_entry_data_t data;
 } raft_entry_t;
 
-typedef struct {
-  unsigned int leader_term;
-  unsigned int server_id;
-  unsigned int leader_commit_idx;
-  unsigned int prev_idx;
-  unsigned int prev_term;
-  int client_id;
-  int client_mc;
-  int channel_seq;
-  raft_entry_t ety;
-} replicant_t;
-
 /** Message sent from client to server.
  * The client sends this message to a server with the intention of having it
  * applied to the FSM. */
@@ -298,8 +286,7 @@ typedef int (
     void *user_data,
     raft_entry_t *entry,
     raft_entry_t *prev,
-    int entry_idx,
-    replicant_t *rep
+    int entry_idx
     );
 
 typedef int (
@@ -310,15 +297,8 @@ typedef int (
     raft_entry_t *entry,
     raft_entry_t *prev,
     int entry_idx,
-    int count,
-    replicant_t *rep
+    int count
     );
-
-typedef void (
-*func_client_assist_ok_f
-	      ) ( void *user_data,
-		  replicant_t *rep
-		  );
 
 typedef void (
 *func_append_resp_f
@@ -333,9 +313,6 @@ typedef struct
 
     /** Callback for sending appendentries messages */
     func_send_appendentries_f send_appendentries;
-
-    /** Callback to send a positive response to client assist */
-    func_client_assist_ok_f client_assist_ok;
 
     /** Callback to send a positive response to leader */
     func_append_resp_f send_appendentries_response;
@@ -486,16 +463,6 @@ int raft_recv_appendentries(raft_server_t* me,
                             raft_node_t* node,
                             msg_appendentries_t* ae,
                             msg_appendentries_response_t *r);
-
-/* client assist version */
-void raft_recv_assisted_appendentries(raft_server_t* me,
-				      replicant_t *rep);
-
-
-/* Final quorum from client assist */
-void raft_recv_assisted_quorum(raft_server_t *me,
-			       replicant_t *rep,
-			       unsigned long quorum);
 
 
 /** Receive a response from an appendentries message we sent.
@@ -713,10 +680,10 @@ void raft_set_commit_idx(raft_server_t* me, int commit_idx);
  * @return
  *  0 on success;
  *  RAFT_ERR_SHUTDOWN server should shutdown */
-int raft_append_entry(raft_server_t* me, raft_entry_t* ety, replicant_t *rep);
+int raft_append_entry(raft_server_t* me, raft_entry_t* ety);
 
 /* batch version */
-int raft_append_entry_batch(raft_server_t* me, raft_entry_t* ety, int count, replicant_t *rep);
+int raft_append_entry_batch(raft_server_t* me, raft_entry_t* ety, int count);
 
 
 /** Confirm if a msg_entry_response has been committed.
@@ -796,10 +763,6 @@ void raft_loaded_checkpoint(raft_server_t *me_,
 /* Get last applied entry */
 raft_entry_t *raft_last_applied_ety(raft_server_t *me_);
 
-
-/* Toggle client assist */
-void raft_set_client_assist(raft_server_t *me_);
-void raft_unset_client_assist(raft_server_t *me_);
 
 /* Toggle multi-inflight  */
 void raft_set_multi_inflight(raft_server_t *me_);

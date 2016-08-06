@@ -18,10 +18,10 @@ void log_load_from_checkpoint(log_t* me_, int idx, raft_entry_t *entry);
  * Don't add entry if we've already added this entry (based off ID)
  * Don't add entries with ID=0 
  * @return 0 if unsucessful; 1 otherwise */
-int log_append_entry(log_t* me_, raft_entry_t* c, replicant_t *rep);
+int log_append_entry(log_t* me_, raft_entry_t* c);
 
 /* And the batch version */
-int log_append_batch(log_t* me_, raft_entry_t* c, int count, replicant_t *rep);
+int log_append_batch(log_t* me_, raft_entry_t* c, int count);
 
 int is_assisted_public(log_t *me_, int idx);
 

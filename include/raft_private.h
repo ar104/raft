@@ -1,8 +1,6 @@
 #ifndef RAFT_PRIVATE_H_
 #define RAFT_PRIVATE_H_
 
-#include "raft_log_cache.h"
-
 /**
  * Copyright (c) 2013, Willem-Hendrik Thiart
  * Use of this source code is governed by a BSD-style license that can be
@@ -27,9 +25,6 @@ typedef struct {
     void* log;
 
     /* Volatile state: */
-  
-    /* Log cache */
-    log_cache_t *log_cache;
   
     /* idx of highest log entry known to be committed */
     int commit_idx;
@@ -77,9 +72,6 @@ typedef struct {
     /* Image build in progress */
     volatile int img_build_in_progress;
 
-    /* Flag to toggle client assist */ 
-    volatile int client_assist;
-
     /* Flag to turn on multiple inflight requests */
     volatile int multi_inflight;
 
@@ -114,7 +106,7 @@ int raft_apply_entry(raft_server_t* me_);
  * Appends entry using the current term.
  * Note: we make the assumption that current term is up-to-date
  * @return 0 if unsuccessful */
-int raft_append_entry(raft_server_t* me_, raft_entry_t* c, replicant_t *rep);
+int raft_append_entry(raft_server_t* me_, raft_entry_t* c);
 
 void raft_set_last_applied_idx(raft_server_t* me, int idx);
 

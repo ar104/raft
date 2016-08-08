@@ -235,13 +235,24 @@ void raft_become_follower(raft_server_t* me_)
     raft_set_state(me_, RAFT_STATE_FOLLOWER);
 }
 
+void compact_log(raft_server_t *me_)
+{
+  raft_server_private_t* me = (raft_server_private_t*)me_;
+  if(me->last_compacted_idx < me->next_compaction_idx) {
+    log_poll_batch(me->log, me->next_compaction_idx - me->last_compacted_idx);
+    me->last_compacted_idx = me->next_compaction_idx;
+  }
+  if(me->last_applied_idx > me->log_target) {
+    me->next_compaction_idx = me->last_applied_idx - me->log_target;
+  }
+}
+
 int raft_periodic(raft_server_t* me_, int msec_since_last_period)
 {
     raft_server_private_t* me = (raft_server_private_t*)me_;
     int i;
 
     me->timeout_elapsed += msec_since_last_period;
-    me->last_compaction += msec_since_last_period;
     resp_timeout        += msec_since_last_period;
 
     if(me->nack_timeout <= resp_timeout) {
@@ -284,16 +295,6 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
 	  return -1;
       }
     }
-
-    if(me->last_compacted_idx < me->next_compaction_idx) {
-      log_poll_batch(me->log, me->next_compaction_idx - me->last_compacted_idx);
-      me->last_compacted_idx = me->next_compaction_idx;
-    }
-    if(me->last_applied_idx > me->log_target) {
-      me->next_compaction_idx = me->last_applied_idx - me->log_target;
-    }
-    me->last_compaction = 0;
-        
     return 0;
 }
 
@@ -852,6 +853,8 @@ int raft_apply_entry(raft_server_t* me_)
         if (RAFT_ERR_SHUTDOWN == e)
             return RAFT_ERR_SHUTDOWN;
     }
+
+    compact_log(me_);
 
     /* voting cfg change is now complete */
     if (log_idx == me->voting_cfg_change_log_idx)

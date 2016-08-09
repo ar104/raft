@@ -111,35 +111,6 @@ void raft_unset_multi_inflight(raft_server_t *me_)
   me->multi_inflight = 0;
 }
 
-void raft_loaded_checkpoint(raft_server_t *me_,
-			    int last_included_term,
-			    int last_included_index,
-			    raft_entry_t *last_included_entry,
-			    int master)
-{
-  raft_server_private_t* me = (raft_server_private_t*)me_;
-  if(last_included_index == -1) {
-    return;
-  }
-  me->current_term = last_included_term;
-  me->voted_for = -1;
-  raft_set_state((raft_server_t*)me, RAFT_STATE_FOLLOWER);
-  me->current_leader = raft_get_node(me_, master);
-  log_load_from_checkpoint(me->log,
-			   last_included_index,
-			   last_included_entry);
-  raft_set_commit_idx(me_, last_included_index);
-  me->last_applied_idx = last_included_index;
-  if(me->last_applied_idx > 0) {
-    me->last_compacted_idx = me->last_applied_idx - 1;
-    me->next_compaction_idx = me->last_applied_idx - 1;
-  }
-  else {
-    me->last_compacted_idx  = 0;
-    me->next_compaction_idx = 0;
-  }
-}
-
 void raft_set_callbacks(raft_server_t* me_, raft_cbs_t* funcs, void* udata)
 {
     raft_server_private_t* me = (raft_server_private_t*)me_;
@@ -956,13 +927,15 @@ raft_node_t* raft_add_node(raft_server_t* me_, void* udata, int id, int is_self)
     return me->nodes[me->num_nodes - 1];
 }
 
-raft_node_t* raft_add_non_voting_node(raft_server_t* me_, int checkpoint_idx,
-				      void* udata, int id, int is_self)
+raft_node_t* raft_add_non_voting_node(raft_server_t* me_, 
+				      void* udata, 
+				      int id, 
+				      int is_self)
 {
     raft_node_t* node = raft_add_node(me_, udata, id, is_self);
     raft_node_set_voting(node, 0);
-    raft_node_set_next_idx(node, checkpoint_idx + 1);
-    raft_node_set_match_idx(node, checkpoint_idx);
+    raft_node_set_next_idx(node, raft_get_current_idx(me_) + 1);
+    raft_node_set_match_idx(node, 0);
     return node;
 }
 

@@ -413,7 +413,7 @@ raft_node_t* raft_add_node(raft_server_t* me, void* user_data, int id, int is_se
 
 /** Add a node which does not participate in voting.
  * Parameters are identical to raft_add_node */
-raft_node_t* raft_add_non_voting_node(raft_server_t* me_, int checkpoint_idx, void* udata, int id, int is_self);
+raft_node_t* raft_add_non_voting_node(raft_server_t* me_, void* udata, int id, int is_self);
 
 /** Remove node.
  * @param node The node to be removed. */
@@ -750,15 +750,6 @@ void raft_set_img_build(raft_server_t *me_);
  * Safe to apply raft entries
  */
 void raft_unset_img_build(raft_server_t *me_);
-
-/** Load raft state from checkpoint
- */
-
-void raft_loaded_checkpoint(raft_server_t *me_,
-			    int term,
-			    int idx,
-			    raft_entry_t *ety,
-			    int master);
 
 /* Get last applied entry */
 raft_entry_t *raft_last_applied_ety(raft_server_t *me_);

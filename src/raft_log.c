@@ -87,23 +87,6 @@ static void __ensurecapacity_batch(log_private_t * me, int count)
     }
 }
 
-void log_load_from_checkpoint(log_t *me_,
-			      int index,
-			      raft_entry_t *entry)
-{
-  log_private_t* me = (log_private_t*)me_;
-  if(index > 0) {
-    me->front = index - 1;
-    me->back  = index;
-    memcpy(&me->entries[REL_POS(me->front, me->size)], entry, sizeof(raft_entry_t));
-    me->count = 1;
-  }
-  else {
-    me->front = me->back = 0;
-    me->count = 0;
-  }
-}
-
 log_t* log_new()
 {
     log_private_t* me = (log_private_t*)calloc(1, sizeof(log_private_t));

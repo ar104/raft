@@ -289,7 +289,7 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
             raft_election_start(me_);
     }
 
-    if (me->last_applied_idx < me->commit_idx && !raft_get_img_build(me_)) {
+    if (me->last_applied_idx < me->commit_idx) {
       while(me->last_applied_idx < me->commit_idx) {
 	if (-1 == raft_apply_entry(me_))
 	  return -1;
@@ -398,7 +398,7 @@ int raft_recv_appendentries_response(raft_server_t* me_,
     if (raft_get_entry_from_idx(me_, raft_node_get_next_idx(node)))
         raft_send_appendentries(me_, node);
 
-    if (me->last_applied_idx < me->commit_idx && !raft_get_img_build(me_)) {
+    if (me->last_applied_idx < me->commit_idx) {
       while(me->last_applied_idx < me->commit_idx) {
 	if (-1 == raft_apply_entry(me_))
 	  break;
@@ -1035,8 +1035,6 @@ int raft_msg_entry_response_committed(raft_server_t* me_,
 
 int raft_apply_all(raft_server_t* me_)
 {
-    if(raft_get_img_build(me_))
-      return 0;
     while (raft_get_last_applied_idx(me_) < raft_get_commit_idx(me_))
     {
         int e = raft_apply_entry(me_);

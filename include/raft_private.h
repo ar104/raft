@@ -69,10 +69,7 @@ typedef struct {
     /* the log which has a voting cfg change, otherwise -1 */
     int voting_cfg_change_log_idx;
 
-    /* Image build in progress */
-    volatile int img_build_in_progress;
-
-    /* Flag to turn on multiple inflight requests */
+  /* Flag to turn on multiple inflight requests */
     volatile int multi_inflight;
 
 } raft_server_private_t;

@@ -94,7 +94,6 @@ raft_server_t* raft_new()
     me->current_leader = NULL;
     me->last_compacted_idx = me->last_applied_idx;
     me->next_compaction_idx = me->last_applied_idx;
-    me->img_build_in_progress = 0;
     me->multi_inflight = 0;
     return (raft_server_t*)me;
 }
@@ -142,7 +141,6 @@ void raft_clear(raft_server_t* me_)
     me->last_applied_idx = 0;
     me->num_nodes = 0;
     me->node = NULL;
-    me->voting_cfg_change_log_idx = 0;
     log_clear(me->log);
 }
 
@@ -252,9 +250,9 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
 	}
       
     }
-    // Dont become the leader if building images or bad things will happen
-    // when we get a client request
-    else if (me->election_timeout <= me->timeout_elapsed && !raft_get_img_build(me_))
+    // Dont become the leader if we don't have voting rights
+    else if (me->election_timeout <= me->timeout_elapsed && 
+	     raft_node_is_voting(me->node))
     {
         if (1 < me->num_nodes)
             raft_election_start(me_);
@@ -386,6 +384,7 @@ int raft_recv_appendentries(
     )
 {
     raft_server_private_t* me = (raft_server_private_t*)me_;
+    int i, xxx;
 
     me->timeout_elapsed = 0;
 
@@ -416,6 +415,10 @@ int raft_recv_appendentries(
         raft_set_current_term(me_, ae->term);
         r->term = ae->term;
         raft_become_follower(me_);
+	if(!raft_node_is_voting(me->node)) {
+	  // Delete everything -- wait for cfg change entry
+	  log_delete(me_, 1);
+	}
     }
     else if (ae->term < me->current_term)
     {
@@ -423,6 +426,15 @@ int raft_recv_appendentries(
         __log(me_, node, "AE term %d is less than current term %d",
               ae->term, me->current_term);
         goto fail_with_current_idx;
+    }
+
+    // If we are not a voting node and have an empty log 
+    // accept only a cfg change entry
+    if(!raft_node_is_voting(me->node) && raft_get_current_idx(me_) == 0) {
+      if(raft_entry_is_voting_cfg_change(&ae->entries[0])) {
+	i = 0;
+	goto accept_entries;
+      }
     }
 
     /* Not the first appendentries we've received */
@@ -448,6 +460,10 @@ int raft_recv_appendentries(
                   e->term, ae->prev_log_term, raft_get_current_idx(me_), ae->prev_log_idx);
             assert(me->commit_idx < ae->prev_log_idx);
             /* Delete all the following log entries because they don't match */
+	    if(me->voting_cfg_change_log_idx != -1 && 
+	       me->voting_cfg_change_log_idx >= ae->prev_log_idx) {
+	      me->voting_cfg_change_log_idx = -1;
+	    }
             log_delete(me->log, ae->prev_log_idx);
             r->current_idx = ae->prev_log_idx - 1;
             goto fail;
@@ -460,12 +476,15 @@ int raft_recv_appendentries(
     if (ae->n_entries == 0 && 0 < ae->prev_log_idx && ae->prev_log_idx + 1 < raft_get_current_idx(me_))
     {
         assert(me->commit_idx < ae->prev_log_idx + 1);
+	if(me->voting_cfg_change_log_idx != -1 && 
+	   me->voting_cfg_change_log_idx >= ae->prev_log_idx + 1) {
+	  me->voting_cfg_change_log_idx = -1;
+	}
         log_delete(me->log, ae->prev_log_idx + 1);
     }
 
     r->current_idx = ae->prev_log_idx;
 
-    int i, xxx;
     for (i = 0; i < ae->n_entries; i++)
     {
         msg_entry_t* ety = &ae->entries[i];
@@ -475,6 +494,10 @@ int raft_recv_appendentries(
         if (existing_ety && existing_ety->term != ety->term)
         {
             assert(me->commit_idx < ety_index);
+	    if(me->voting_cfg_change_log_idx != -1 && 
+	       me->voting_cfg_change_log_idx >= ety_index) {
+	      me->voting_cfg_change_log_idx = -1;
+	    }
             log_delete(me->log, ety_index);
             break;
         }
@@ -482,6 +505,7 @@ int raft_recv_appendentries(
             break;
     }
 
+ accept_entries:
     /* Pick up remainder in case of mismatch or missing entry */
     if(i < ae->n_entries) {
       raft_append_entry_batch(me_, 
@@ -500,7 +524,10 @@ int raft_recv_appendentries(
     
     for (; i < ae->n_entries; i++)
     {
-        r->current_idx = ae->prev_log_idx + 1 + i;
+      if(raft_entry_is_voting_cfg_change(&ae->entries[i])) {
+	me->voting_cfg_change_log_idx = ae->prev_log_idx + 1 + i;
+      }
+      r->current_idx = ae->prev_log_idx + 1 + i;
     }
 
 
@@ -722,11 +749,18 @@ int raft_recv_entry_batch(raft_server_t* me_,
     if (!raft_is_leader(me_))
         return RAFT_ERR_NOT_LEADER;
 
+    int detected_voting_cfg_change = me->voting_cfg_change_log_idx;
     for(i=0;i<count;i++) {
       __log(me_, NULL, "received entry t:%d id: %d idx: %d",
       	    me->current_term, (e + i)->id, raft_get_current_idx(me_) + i + 1);
       (e + i)->term = me->current_term;
+      if (raft_entry_is_voting_cfg_change(e + i)) {
+	if(detected_voting_cfg_change != -1)
+	  return RAFT_ERR_ONE_VOTING_CHANGE_ONLY;
+	detected_voting_cfg_change = raft_get_current_idx(me_) + 1 + i;
+      }
     }
+    me->voting_cfg_change_log_idx = detected_voting_cfg_change;
     
     int new_idx = raft_get_current_idx(me_) + 1;
     raft_append_entry_batch(me_, e, count);
@@ -758,9 +792,6 @@ int raft_recv_entry_batch(raft_server_t* me_,
 	r->term = me->current_term;
       } 
     }
-    if (raft_entry_is_voting_cfg_change(e))
-        me->voting_cfg_change_log_idx = raft_get_current_idx(me_);
-
     return 0;
 }
 
@@ -786,10 +817,6 @@ int raft_send_requestvote(raft_server_t* me_, raft_node_t* node)
 int raft_append_entry(raft_server_t* me_, raft_entry_t* ety)
 {
     raft_server_private_t* me = (raft_server_private_t*)me_;
-
-    if (raft_entry_is_voting_cfg_change(ety))
-        me->voting_cfg_change_log_idx = raft_get_current_idx(me_);
-
     return log_append_entry(me->log, ety);
 }
 
@@ -934,6 +961,7 @@ raft_node_t* raft_add_non_voting_node(raft_server_t* me_,
 {
     raft_node_t* node = raft_add_node(me_, udata, id, is_self);
     raft_node_set_voting(node, 0);
+    // Note: following line sets the next idx to the cfg change log entry
     raft_node_set_next_idx(node, raft_get_current_idx(me_) + 1);
     raft_node_set_match_idx(node, 0);
     return node;

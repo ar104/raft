@@ -741,16 +741,6 @@ int raft_entry_is_voting_cfg_change(raft_entry_t* ety);
  * @return 1 if this is a configuration change. */
 int raft_entry_is_cfg_change(raft_entry_t* ety);
 
-/** Indicate an image build is in progress
- * Do not apply raft entries
- */
-void raft_set_img_build(raft_server_t *me_);
-
-/** Indicate image building is complete
- * Safe to apply raft entries
- */
-void raft_unset_img_build(raft_server_t *me_);
-
 /* Get last applied entry */
 raft_entry_t *raft_last_applied_ety(raft_server_t *me_);
 

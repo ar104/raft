@@ -960,10 +960,11 @@ raft_node_t* raft_add_non_voting_node(raft_server_t* me_,
 				      int id, 
 				      int is_self)
 {
+    raft_server_private_t* me = (raft_server_private_t*)me_;
     raft_node_t* node = raft_add_node(me_, udata, id, is_self);
     raft_node_set_voting(node, 0);
     // Note: following line sets the next idx to the cfg change log entry
-    raft_node_set_next_idx(node, raft_get_current_idx(me_) + 1);
+    raft_node_set_next_idx(node, me->voting_cfg_change_log_idx);
     raft_node_set_match_idx(node, 0);
     return node;
 }
@@ -1049,7 +1050,7 @@ int raft_apply_all(raft_server_t* me_)
 
 int raft_entry_is_voting_cfg_change(raft_entry_t* ety)
 {
-    return RAFT_LOGTYPE_ADD_NODE == ety->type ||
+    return RAFT_LOGTYPE_ADD_NONVOTING_NODE == ety->type ||
            RAFT_LOGTYPE_REMOVE_NODE == ety->type;
 }
 

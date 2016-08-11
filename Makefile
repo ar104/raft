@@ -9,7 +9,7 @@ SHELL  = /bin/bash
 CFLAGS += -Iinclude -Werror -Werror=return-type -Werror=uninitialized -Wcast-align \
 	  -Wno-pointer-sign -fno-omit-frame-pointer -fno-common -fsigned-char \
 	  -Wunused-variable \
-	  $(GCOV_CCFLAGS) -I$(LLQUEUE_DIR) -Iinclude -g -O2 -fPIC
+	  -I$(LLQUEUE_DIR) -Iinclude -g -O2
 
 UNAME := $(shell uname)
 
@@ -26,7 +26,7 @@ endif
 
 OBJECTS = raft_server.o raft_server_properties.o raft_node.o raft_log.o
 
-all: static shared
+all: static
 
 clinkedlistqueue:
 	mkdir -p $(LLQUEUE_DIR)/.git

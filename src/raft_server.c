@@ -28,22 +28,6 @@
 #define max(a, b) ((a) < (b) ? (b) : (a))
 #endif
 
-static int resp_term    = 0;
-static int resp_idx     = 0;
-static int resp_timeout = 0;
-
-void suppress_resp(msg_appendentries_response_t *r)
-{
-  if(r->term == resp_term && r->current_idx == resp_idx) {
-    r->current_idx = 0;
-  }
-  else {
-    resp_term    = r->term;
-    resp_idx     = r->current_idx;
-    resp_timeout = 0;
-  }
-}
-
 static void __log(raft_server_t *me_, raft_node_t* node, const char *fmt, ...)
 {
   raft_server_private_t* me = (raft_server_private_t*)me_;
@@ -85,7 +69,6 @@ raft_server_t* raft_new()
     me->timeout_elapsed = 0;
     me->last_compaction = 0;
     me->request_timeout = 200;
-    me->nack_timeout    = 200;
     me->log_target      = 10000;
     me->election_timeout = 1000;
     me->log = log_new();
@@ -222,13 +205,6 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
     int i;
 
     me->timeout_elapsed += msec_since_last_period;
-    resp_timeout        += msec_since_last_period;
-
-    if(me->nack_timeout <= resp_timeout) {
-      resp_term    = 0;
-      resp_idx     = 0;
-      resp_timeout = 0;
-    }
 
     /* Only one voting node means it's safe for us to become the leader */
     if (1 == raft_get_num_voting_nodes(me_) &&

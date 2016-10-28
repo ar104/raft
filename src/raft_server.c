@@ -67,9 +67,9 @@ raft_server_t* raft_new()
     me->current_term = 0;
     me->voted_for = -1;
     me->timeout_elapsed = 0;
-    me->last_compaction = 0;
     me->request_timeout = 200;
     me->log_target      = 10000;
+    me->log_base        = 0;
     me->election_timeout = 1000;
     me->log = log_new();
     me->voting_cfg_change_log_idx = -1;
@@ -121,6 +121,7 @@ void raft_clear(raft_server_t* me_)
     raft_set_state((raft_server_t*)me, RAFT_STATE_FOLLOWER);
     me->current_leader = NULL;
     me->commit_idx = 0;
+    me->log_base   = 0;
     me->last_applied_idx = 0;
     me->num_nodes = 0;
     me->node = NULL;
@@ -187,16 +188,25 @@ void raft_become_follower(raft_server_t* me_)
     raft_set_state(me_, RAFT_STATE_FOLLOWER);
 }
 
-void compact_log(raft_server_t *me_)
+static void raft_compact_log(raft_server_t *me_)
 {
   raft_server_private_t* me = (raft_server_private_t*)me_;
   if(me->last_compacted_idx < me->next_compaction_idx) {
     log_poll_batch(me->log, me->next_compaction_idx - me->last_compacted_idx);
     me->last_compacted_idx = me->next_compaction_idx;
   }
-  if(me->last_applied_idx > me->log_target) {
-    me->next_compaction_idx = me->last_applied_idx - me->log_target;
-  }
+  int target = me->log_base;
+  if(me->last_applied_idx < (target + me->log_target))
+    return; // Not enough log entries
+  me->next_compaction_idx = target;
+}
+
+void raft_checkpoint(raft_server_t *me_, int log_index)
+{
+  raft_server_private_t* me = (raft_server_private_t*)me_;
+  if(log_index > me->last_applied_idx)
+    return; // Something wrong.
+  me->log_base = log_index;
 }
 
 int raft_periodic(raft_server_t* me_, int msec_since_last_period)
@@ -405,18 +415,9 @@ int raft_recv_appendentries(
         goto fail_with_current_idx;
     }
 
-    // If we are not a voting node and have an empty log 
-    // accept only a cfg change entry
-    if(!raft_node_is_voting(me->node) && raft_get_current_idx(me_) == 0) {
-      if(raft_entry_is_voting_cfg_change(&ae->entries[0])) {
-	i = 0;
-	goto accept_entries;
-      }
-    }
-
     /* Not the first appendentries we've received */
     /* NOTE: the log starts at 1 */
-    if (0 < ae->prev_log_idx)
+    if (0 < ae->prev_log_idx && ae->prev_log_idx != me->log_base)
     {
         raft_entry_t* e = raft_get_entry_from_idx(me_, ae->prev_log_idx);
 

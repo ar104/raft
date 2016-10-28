@@ -38,8 +38,8 @@ typedef struct {
     /* amount of time left till timeout */
     int timeout_elapsed;
 
-    /* amount of time since last compaction */
-    int last_compaction;
+    /* Base of log -- assume this entry is present */
+    int log_base;
 
     /* Last compacted idx */
     int last_compacted_idx;

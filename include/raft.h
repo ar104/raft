@@ -749,4 +749,8 @@ raft_entry_t *raft_last_applied_ety(raft_server_t *me_);
 void raft_set_multi_inflight(raft_server_t *me_);
 void raft_unset_multi_inflight(raft_server_t *me_);
 
+/* Inform RAFT of app checkpoint */
+/* second param is last log index included in checkpoint */
+void raft_checkpoint(raft_server_t *me_, int log_index);
+
 #endif /* RAFT_H_ */

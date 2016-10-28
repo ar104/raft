@@ -188,7 +188,7 @@ void raft_become_follower(raft_server_t* me_)
     raft_set_state(me_, RAFT_STATE_FOLLOWER);
 }
 
-static void raft_compact_log(raft_server_t *me_)
+static void compact_log(raft_server_t *me_)
 {
   raft_server_private_t* me = (raft_server_private_t*)me_;
   if(me->last_compacted_idx < me->next_compaction_idx) {

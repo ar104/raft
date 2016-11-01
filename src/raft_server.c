@@ -196,9 +196,9 @@ static void compact_log(raft_server_t *me_)
     me->last_compacted_idx = me->next_compaction_idx;
   }
   int target = me->log_base;
-  if(me->last_applied_idx < (target + me->log_target))
+  if(target < (me->last_compacted_idx + me->log_target))
     return; // Not enough log entries
-  me->next_compaction_idx = target;
+  me->next_compaction_idx = target - me->log_target;
 }
 
 void raft_checkpoint(raft_server_t *me_, int log_index)
@@ -206,7 +206,8 @@ void raft_checkpoint(raft_server_t *me_, int log_index)
   raft_server_private_t* me = (raft_server_private_t*)me_;
   if(log_index > me->last_applied_idx)
     me->log_base = me->last_applied_idx;
-  me->log_base = log_index;
+  else
+    me->log_base = log_index;
 }
 
 int raft_periodic(raft_server_t* me_, int msec_since_last_period)

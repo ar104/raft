@@ -205,7 +205,7 @@ void raft_checkpoint(raft_server_t *me_, int log_index)
 {
   raft_server_private_t* me = (raft_server_private_t*)me_;
   if(log_index > me->last_applied_idx)
-    return; // Something wrong.
+    me->log_base = me->last_applied_idx;
   me->log_base = log_index;
 }
 

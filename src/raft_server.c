@@ -76,7 +76,6 @@ raft_server_t* raft_new()
     raft_set_state((raft_server_t*)me, RAFT_STATE_FOLLOWER);
     me->current_leader = NULL;
     me->last_compacted_idx = me->last_applied_idx;
-    me->next_compaction_idx = me->last_applied_idx;
     me->multi_inflight = 0;
     return (raft_server_t*)me;
 }
@@ -191,14 +190,13 @@ void raft_become_follower(raft_server_t* me_)
 static void compact_log(raft_server_t *me_)
 {
   raft_server_private_t* me = (raft_server_private_t*)me_;
-  if(me->last_compacted_idx < me->next_compaction_idx) {
-    log_poll_batch(me->log, me->next_compaction_idx - me->last_compacted_idx);
-    me->last_compacted_idx = me->next_compaction_idx;
-  }
   int target = me->log_base;
-  if(target < (me->last_compacted_idx + me->log_target))
+  if(target <= (me->last_compacted_idx + me->log_target))
     return; // Not enough log entries
-  me->next_compaction_idx = target - me->log_target;
+  // Adjust target to leave enough log entries for lagging nodes
+  target = target - me->log_target;
+  log_poll_batch(me->log, target - me->last_compacted_idx);
+  me->last_compacted_idx = target;
 }
 
 void raft_checkpoint(raft_server_t *me_, int log_index)
@@ -208,6 +206,7 @@ void raft_checkpoint(raft_server_t *me_, int log_index)
     me->log_base = me->last_applied_idx;
   else
     me->log_base = log_index;
+  compact_log(me_);
 }
 
 int raft_periodic(raft_server_t* me_, int msec_since_last_period)
@@ -830,8 +829,6 @@ int raft_apply_entry(raft_server_t* me_)
         if (RAFT_ERR_SHUTDOWN == e)
             return RAFT_ERR_SHUTDOWN;
     }
-
-    compact_log(me_);
 
     /* voting cfg change is now complete */
     if (log_idx == me->voting_cfg_change_log_idx)

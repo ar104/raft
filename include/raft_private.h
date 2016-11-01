@@ -44,9 +44,6 @@ typedef struct {
     /* Last compacted idx */
     int last_compacted_idx;
 
-    /* Next compaction idx */
-    int next_compaction_idx;
-  
     raft_node_t* nodes;
     int num_nodes;
 

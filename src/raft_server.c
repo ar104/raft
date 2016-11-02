@@ -202,6 +202,7 @@ static void compact_log(raft_server_t *me_)
 void raft_checkpoint(raft_server_t *me_, int log_index)
 {
   raft_server_private_t* me = (raft_server_private_t*)me_;
+  log_index = log_index + 1; // internal numbering
   if(log_index > me->last_applied_idx)
     me->log_base = me->last_applied_idx;
   else

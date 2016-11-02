@@ -191,7 +191,7 @@ static void compact_log(raft_server_t *me_)
 {
   raft_server_private_t* me = (raft_server_private_t*)me_;
   int target = me->log_base;
-  if(target <= (me->last_compacted_idx + me->log_target))
+  if(target <= (me->last_compacted_idx + 2*me->log_target))
     return; // Not enough log entries
   // Adjust target to leave enough log entries for lagging nodes
   target = target - me->log_target;
@@ -417,7 +417,7 @@ int raft_recv_appendentries(
 
     /* Not the first appendentries we've received */
     /* NOTE: the log starts at 1 */
-    if (0 < ae->prev_log_idx && ae->prev_log_idx != me->log_base)
+    if (0 < ae->prev_log_idx && ae->prev_log_idx >= me->log_base)
     {
         raft_entry_t* e = raft_get_entry_from_idx(me_, ae->prev_log_idx);
 

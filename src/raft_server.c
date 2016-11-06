@@ -194,7 +194,7 @@ static void compact_log(raft_server_t *me_)
   if(target <= (me->last_compacted_idx + 2*me->log_target))
     return; // Not enough log entries
   // Adjust target to leave enough log entries for lagging nodes
-  target = me->last_compacted_index + me->log_target;
+  target = me->last_compacted_idx + me->log_target;
   log_poll_batch(me->log, target - me->last_compacted_idx);
   me->last_compacted_idx = target;
 }

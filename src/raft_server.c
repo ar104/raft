@@ -194,7 +194,7 @@ static void compact_log(raft_server_t *me_)
   if(target <= (me->last_compacted_idx + 2*me->log_target))
     return; // Not enough log entries
   // Adjust target to leave enough log entries for lagging nodes
-  target = target - me->log_target;
+  target = me->last_compacted_index + me->log_target;
   log_poll_batch(me->log, target - me->last_compacted_idx);
   me->last_compacted_idx = target;
 }
@@ -207,7 +207,6 @@ void raft_checkpoint(raft_server_t *me_, int log_index)
     me->log_base = me->last_applied_idx;
   else
     me->log_base = log_index;
-  compact_log(me_);
 }
 
 int raft_periodic(raft_server_t* me_, int msec_since_last_period)
@@ -251,6 +250,7 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
 	  return -1;
       }
     }
+    compact_log(me_);
     return 0;
 }
 

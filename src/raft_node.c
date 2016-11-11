@@ -145,3 +145,4 @@ int raft_node_get_id(raft_node_t* me_)
     raft_node_private_t* me = (raft_node_private_t*)me_;
     return me->id;
 }
+

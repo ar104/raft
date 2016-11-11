@@ -435,7 +435,8 @@ void raft_set_request_timeout(raft_server_t* me, int msec);
  */
 void raft_set_nack_timeout(raft_server_t *me, int msec);
 void raft_set_log_target(raft_server_t *me, int target);
-
+void raft_set_preferred_leader(raft_server_t *me);
+void raft_unset_preferred_leader(raft_server_t *me);
 
 /** Process events that are dependent on time passing.
  * @param[in] msec_elapsed Time in milliseconds since the last call

@@ -77,6 +77,7 @@ raft_server_t* raft_new()
     me->current_leader = NULL;
     me->last_compacted_idx = me->last_applied_idx;
     me->multi_inflight = 0;
+    me->preferred_leader = 0;
     return (raft_server_t*)me;
 }
 
@@ -124,8 +125,22 @@ void raft_clear(raft_server_t* me_)
     me->last_applied_idx = 0;
     me->num_nodes = 0;
     me->node = NULL;
+    me->preferred_leader = 0;
     log_clear(me->log);
 }
+
+void raft_set_preferred_leader(raft_server_t *me_)
+{
+  raft_server_private_t *me = (raft_server_private_t*)me_;
+  me->preferred_leader = 1;
+}
+
+void raft_unset_preferred_leader(raft_server_t *me_)
+{
+  raft_server_private_t *me = (raft_server_private_t*)me_;
+  me->preferred_leader = 0;
+}
+
 
 void raft_election_start(raft_server_t* me_)
 {
@@ -374,7 +389,9 @@ int raft_recv_appendentries(
     raft_server_private_t* me = (raft_server_private_t*)me_;
     int i, xxx;
 
-    me->timeout_elapsed = 0;
+    if(!me->preferred_leader) {
+      me->timeout_elapsed = 0;
+    }
 
     if (0 < ae->n_entries)
         __log(me_, node, "recvd appendentries from: %lx, t:%d ci:%d lc:%d pli:%d plt:%d #%d",

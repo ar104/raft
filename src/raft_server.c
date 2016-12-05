@@ -389,7 +389,7 @@ int raft_recv_appendentries(
     raft_server_private_t* me = (raft_server_private_t*)me_;
     int i, xxx;
 
-    if(!me->preferred_leader) {
+    if(!me->preferred_leader || ae->n_entries > 0) {
       me->timeout_elapsed = 0;
     }
 

@@ -770,10 +770,9 @@ int raft_recv_entry_batch(raft_server_t* me_,
 	i = (i + 1)%me->num_nodes;
 	continue;
       }
-      if(raft_node_get_next_idx(me->nodes[i]) == new_idx) {
-	int s = raft_send_appendentries(me_, me->nodes[i]);
-	if(me->multi_inflight)
-	  raft_node_set_next_idx(me->nodes[i], new_idx + s);
+      int s = raft_send_appendentries(me_, me->nodes[i]);
+      if(me->multi_inflight) {
+	raft_node_set_next_idx(me->nodes[i], new_idx + s);
       }
       i = (i + 1)%me->num_nodes;
     } while(i != start);

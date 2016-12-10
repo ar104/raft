@@ -248,6 +248,9 @@ int raft_periodic(raft_server_t* me_, int msec_since_last_period)
 	  if(raft_node_get_elapsed(me->nodes[i]) >= me->request_timeout) {
 	    raft_send_appendentries(me_, me->nodes[i]);
 	  }
+	  else if(raft_node_get_next_idx(me->nodes[i]) <= raft_get_current_idx(me_)) {
+	    raft_send_appendentries(me_, me->nodes[i]);
+	  }
 	}
       
     }

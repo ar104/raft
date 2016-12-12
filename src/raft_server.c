@@ -701,7 +701,6 @@ int raft_recv_entry(raft_server_t* me_,
     memcpy(&ety.data, &e->data, sizeof(raft_entry_data_t));
 
         
-    int new_idx = raft_get_current_idx(me_) + 1;
     raft_append_entry(me_, &ety);
     
     int start = rand()%me->num_nodes;
@@ -714,11 +713,7 @@ int raft_recv_entry(raft_server_t* me_,
 	continue;
       }
       // Aggressively send appendentries if we think node is up to date
-      if(raft_node_get_next_idx(me->nodes[i]) == new_idx) {
-	int s = raft_send_appendentries(me_, me->nodes[i]);
-	if(me->multi_inflight)
-	  raft_node_set_next_idx(me->nodes[i], new_idx + s);
-      }
+      raft_send_appendentries(me_, me->nodes[i]);
       i = (i + 1)%me->num_nodes;
     } while(i != start);
     
@@ -761,7 +756,6 @@ int raft_recv_entry_batch(raft_server_t* me_,
     }
     me->voting_cfg_change_log_idx = detected_voting_cfg_change;
     
-    int new_idx = raft_get_current_idx(me_) + 1;
     raft_append_entry_batch(me_, e, count);
     
     int start = rand()%me->num_nodes;
@@ -773,10 +767,7 @@ int raft_recv_entry_batch(raft_server_t* me_,
 	i = (i + 1)%me->num_nodes;
 	continue;
       }
-      int s = raft_send_appendentries(me_, me->nodes[i]);
-      if(me->multi_inflight) {
-	raft_node_set_next_idx(me->nodes[i], new_idx + s);
-      }
+      raft_send_appendentries(me_, me->nodes[i]);
       i = (i + 1)%me->num_nodes;
     } while(i != start);
     

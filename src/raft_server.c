@@ -364,7 +364,7 @@ int raft_recv_appendentries_response(raft_server_t* me_,
             if (ety && ety->term == me->current_term && point <= match_idx)
                 votes++;
 	    if(me->cb.setmatch != NULL) {
-	      me->cb.setmatch(me_, me->udata, i, match_idx);
+	      me->cb.setmatch(me_, me->udata, i, match_idx - 1);
 	    }
 	}
     }

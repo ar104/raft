@@ -230,14 +230,13 @@ typedef int (
 
 /* callback to set the quorum count */
 typedef int (
-*func_setquorum_f
+*func_setmatch_f
 )   (
     raft_server_t* raft,
     void *user_data,
-    raft_entry_t* ety,
-    int ety_idx,
-    int quorum
-    );
+    int replica,
+    int ety_idx
+     );
 
 /** Callback for saving who we voted for to disk.
  * For safety reasons this callback MUST flush the change to disk.
@@ -332,7 +331,7 @@ typedef struct
      * Return 0 on success.
      * Return RAFT_ERR_SHUTDOWN if you want the server to shutdown. */
     func_applylog_f applylog;
-    func_setquorum_f setquorum;
+    func_setmatch_f setmatch;
 
     /** Callback for persisting vote data
      * For safety reasons this callback MUST flush the change to disk. */

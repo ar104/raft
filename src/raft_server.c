@@ -334,7 +334,7 @@ int raft_recv_appendentries_response(raft_server_t* me_,
     // For a positive ack do not roll back next idx
     raft_node_set_next_idx(node, max(r->current_idx + 1, raft_node_get_next_idx(node)));
     raft_node_set_match_idx(node, r->current_idx);
-
+    
     if (!raft_node_is_voting(node) &&
         -1 == me->voting_cfg_change_log_idx &&
         raft_get_current_idx(me_) <= r->current_idx + 1 &&
@@ -355,7 +355,7 @@ int raft_recv_appendentries_response(raft_server_t* me_,
     {
         if (me->node == me->nodes[i] || !raft_node_is_voting(me->nodes[i]))
             continue;
-
+	
         int match_idx = raft_node_get_match_idx(me->nodes[i]);
 
         if (0 < match_idx)
@@ -363,16 +363,12 @@ int raft_recv_appendentries_response(raft_server_t* me_,
             raft_entry_t* ety = raft_get_entry_from_idx(me_, match_idx);
             if (ety && ety->term == me->current_term && point <= match_idx)
                 votes++;
-        }
+	    if(me->cb.setmatch != NULL) {
+	      me->cb.setmatch(me_, me->udata, i, match_idx);
+	    }
+	}
     }
     
-    if(me->cb.setquorum != NULL) {
-      raft_entry_t *ety = raft_get_entry_from_idx(me_, r->current_idx);
-      if(ety != NULL) {
-	me->cb.setquorum(me_, me->udata, ety, r->current_idx - 1, votes);
-      }
-    }
-
     if (raft_get_num_voting_nodes(me_) / 2 < votes && raft_get_commit_idx(me_) < point)
         raft_set_commit_idx(me_, point);
 

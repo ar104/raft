@@ -365,6 +365,13 @@ int raft_recv_appendentries_response(raft_server_t* me_,
                 votes++;
         }
     }
+    
+    if(me->cb.setquorum != NULL) {
+      raft_entry_t *ety = raft_get_entry_from_idx(me_, r->current_idx);
+      if(ety != NULL) {
+	me->cb.setquorum(me_, me->udata, ety, r->current_idx - 1, votes);
+      }
+    }
 
     if (raft_get_num_voting_nodes(me_) / 2 < votes && raft_get_commit_idx(me_) < point)
         raft_set_commit_idx(me_, point);

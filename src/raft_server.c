@@ -355,15 +355,15 @@ int raft_recv_appendentries_response(raft_server_t* me_,
     {
         if (me->node == me->nodes[i] || !raft_node_is_voting(me->nodes[i]))
             continue;
-	
-        int match_idx = raft_node_get_match_idx(me->nodes[i]);
+
+	int match_idx = raft_node_get_match_idx(me->nodes[i]);
 
         if (0 < match_idx)
         {
             raft_entry_t* ety = raft_get_entry_from_idx(me_, match_idx);
             if (ety && ety->term == me->current_term && point <= match_idx)
                 votes++;
-	    if(me->cb.setmatch != NULL) {
+	    if(node == me->nodes[i] && me->cb.setmatch != NULL) {
 	      me->cb.setmatch(me_, me->udata, i, match_idx - 1);
 	    }
 	}
